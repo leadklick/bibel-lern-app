@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { addVerse, getDefaultTranslation, setDefaultTranslation } from '@/lib/storage';
 import { Verse } from '@/lib/types';
-import { searchBooks, parseReference, BibleBook } from '@/lib/bible-books';
+import { searchBooks, BIBLE_BOOKS, BibleBook } from '@/lib/bible-books';
 
 function generateId() {
   return `verse-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -23,7 +23,13 @@ const TRANSLATIONS = [
 
 export default function AddVersePage() {
   const router = useRouter();
-  const [reference, setReference] = useState('');
+
+  // 3-field reference state
+  const [bookInput, setBookInput] = useState('');
+  const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null);
+  const [chapter, setChapter] = useState('');
+  const [verse, setVerse] = useState('');
+
   const [text, setText] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [translation, setTranslation] = useState('NGU');
@@ -39,9 +45,10 @@ export default function AddVersePage() {
   const [fetchingVerse, setFetchingVerse] = useState(false);
   const [verseFetched, setVerseFetched] = useState(false);
 
-  const refInputRef = useRef<HTMLInputElement>(null);
+  const bookInputRef = useRef<HTMLInputElement>(null);
+  const chapterInputRef = useRef<HTMLInputElement>(null);
+  const verseInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFetchedRef = useRef<string>('');
 
   useEffect(() => {
@@ -53,17 +60,22 @@ export default function AddVersePage() {
     setDefaultTranslation(value);
   };
 
-  // Parse typed query: the book name part (before any digits)
-  function getBookQueryPart(val: string): string {
-    // Everything before the first digit (and strip trailing space)
-    const m = val.match(/^([^\d]+)/);
-    return m ? m[1].trimEnd() : val;
+  // Build the combined reference string: "Buch Kapitel,Vers"
+  function buildReference(book: BibleBook | null, chap: string, ver: string): string {
+    if (!book || !chap || !ver) return '';
+    return `${book.name} ${chap},${ver}`;
+  }
+
+  // Build BibleGateway ref for API call
+  function buildBgRef(book: BibleBook | null, chap: string, ver: string): string | null {
+    if (!book || !chap || !ver) return null;
+    return `${book.bgName}+${chap}:${ver}`;
   }
 
   const fetchVerseText = useCallback(
-    async (ref: string) => {
-      if (ref === lastFetchedRef.current) return;
-      lastFetchedRef.current = ref;
+    async (bgRef: string) => {
+      if (bgRef === lastFetchedRef.current) return;
+      lastFetchedRef.current = bgRef;
 
       const translationObj = TRANSLATIONS.find((t) => t.value === translation);
       const bgVersion = translationObj?.bgVersion ?? 'NGU-DE';
@@ -75,7 +87,7 @@ export default function AddVersePage() {
 
       try {
         const res = await fetch(
-          `/api/verse?ref=${encodeURIComponent(ref)}&version=${encodeURIComponent(bgVersion)}`
+          `/api/verse?ref=${encodeURIComponent(bgRef)}&version=${encodeURIComponent(bgVersion)}`
         );
         const data = await res.json();
         if (data.text) {
@@ -91,56 +103,48 @@ export default function AddVersePage() {
     [translation]
   );
 
-  const handleReferenceChange = (val: string) => {
-    setReference(val);
+  // Attempt auto-fetch when all three fields are set
+  const tryAutoFetch = useCallback(
+    (book: BibleBook | null, chap: string, ver: string) => {
+      const bgRef = buildBgRef(book, chap, ver);
+      if (bgRef) {
+        fetchVerseText(bgRef);
+      }
+    },
+    [fetchVerseText]
+  );
+
+  // Book input change
+  const handleBookInputChange = (val: string) => {
+    setBookInput(val);
+    setSelectedBook(null);
     setVerseFetched(false);
     setActiveSuggestion(-1);
+    lastFetchedRef.current = '';
 
-    // Determine book query (before digits)
-    const bookQuery = getBookQueryPart(val);
-
-    if (bookQuery.length >= 1) {
-      const results = searchBooks(bookQuery);
-      // Only show suggestions if user hasn't finished typing chapter:verse yet
-      const hasChapterVerse = /\d+[,:.]\d+/.test(val);
-      if (!hasChapterVerse) {
-        setSuggestions(results);
-        setShowSuggestions(results.length > 0);
-      } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
-      }
+    if (val.trim().length >= 1) {
+      const results = searchBooks(val.trim());
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
     }
-
-    // Check if reference looks complete → schedule fetch
-    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
-    const parsed = parseReference(val);
-    if (parsed) {
-      fetchTimeoutRef.current = setTimeout(() => {
-        fetchVerseText(parsed.bgRef);
-      }, 600);
-    }
   };
 
   const selectBook = (book: BibleBook) => {
-    setReference(book.name + ' ');
+    setBookInput(book.name);
+    setSelectedBook(book);
     setSuggestions([]);
     setShowSuggestions(false);
     setActiveSuggestion(-1);
-    // Focus input and place cursor at end
+    // Move focus to Kapitel field
     setTimeout(() => {
-      if (refInputRef.current) {
-        refInputRef.current.focus();
-        const len = refInputRef.current.value.length;
-        refInputRef.current.setSelectionRange(len, len);
-      }
+      chapterInputRef.current?.focus();
     }, 0);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleBookKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions) return;
 
     if (e.key === 'ArrowDown') {
@@ -157,14 +161,44 @@ export default function AddVersePage() {
     }
   };
 
+  // Chapter field handlers
+  const handleChapterChange = (val: string) => {
+    setChapter(val);
+    setVerseFetched(false);
+    lastFetchedRef.current = '';
+  };
+
+  const handleChapterBlur = () => {
+    tryAutoFetch(selectedBook, chapter, verse);
+  };
+
+  // Verse field handlers
+  const handleVerseChange = (val: string) => {
+    setVerse(val);
+    setVerseFetched(false);
+    lastFetchedRef.current = '';
+  };
+
+  const handleVerseBlur = () => {
+    tryAutoFetch(selectedBook, chapter, verse);
+  };
+
+  // Also try fetch when verse field gets a value and all others are filled
+  useEffect(() => {
+    if (selectedBook && chapter && verse) {
+      tryAutoFetch(selectedBook, chapter, verse);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verse, selectedBook, chapter]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
         suggestionsRef.current &&
         !suggestionsRef.current.contains(e.target as Node) &&
-        refInputRef.current &&
-        !refInputRef.current.contains(e.target as Node)
+        bookInputRef.current &&
+        !bookInputRef.current.contains(e.target as Node)
       ) {
         setShowSuggestions(false);
       }
@@ -177,8 +211,10 @@ export default function AddVersePage() {
     e.preventDefault();
     setError('');
 
+    const reference = buildReference(selectedBook, chapter, verse);
+
     if (!reference.trim()) {
-      setError('Bitte gib eine Bibelstelle ein (z. B. Johannes 3:16).');
+      setError('Bitte wähle ein Buch und gib Kapitel und Vers ein (z. B. Philipper 4,13).');
       return;
     }
     if (!text.trim()) {
@@ -194,7 +230,7 @@ export default function AddVersePage() {
       .filter(Boolean);
 
     const now = Date.now();
-    const verse: Verse = {
+    const verseObj: Verse = {
       id: generateId(),
       reference: reference.trim(),
       text: text.trim(),
@@ -210,7 +246,7 @@ export default function AddVersePage() {
       successCount: 0,
     };
 
-    addVerse(verse);
+    addVerse(verseObj);
     router.push('/verse');
   };
 
@@ -230,52 +266,84 @@ export default function AddVersePage() {
         onSubmit={handleSubmit}
         className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 md:p-6 flex flex-col gap-5"
       >
+        {/* 3-field reference row */}
         <div className="flex flex-col gap-1.5">
           <label className="text-base font-semibold text-blue-800">
             Bibelstelle <span className="text-red-400">*</span>
           </label>
-          <p className="text-xs text-blue-400">z. B. Johannes 3,16 oder Phil 4,13</p>
-          <div className="relative">
-            <input
-              ref={refInputRef}
-              type="text"
-              value={reference}
-              onChange={(e) => handleReferenceChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => {
-                if (suggestions.length > 0) setShowSuggestions(true);
-              }}
-              placeholder="Johannes 3,16"
-              className={inputClass}
-              autoComplete="off"
-            />
+          <p className="text-xs text-blue-400">z. B. Philipper · 4 · 13</p>
 
-            {/* Dropdown suggestions */}
-            {showSuggestions && suggestions.length > 0 && (
-              <div
-                ref={suggestionsRef}
-                className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-blue-200 rounded-xl shadow-lg overflow-hidden"
-              >
-                {suggestions.map((book, idx) => (
-                  <button
-                    key={book.name}
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      selectBook(book);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
-                      idx === activeSuggestion
-                        ? 'bg-blue-100 text-blue-900'
-                        : 'hover:bg-blue-50 text-blue-800'
-                    }`}
-                  >
-                    <span className="font-medium">{book.name}</span>
-                    <span className="text-xs text-blue-400 ml-2">{book.testament}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="flex gap-2 items-start">
+            {/* Buch (autocomplete) */}
+            <div className="relative flex-[3]">
+              <input
+                ref={bookInputRef}
+                type="text"
+                value={bookInput}
+                onChange={(e) => handleBookInputChange(e.target.value)}
+                onKeyDown={handleBookKeyDown}
+                onFocus={() => {
+                  if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                placeholder="Buch"
+                className={inputClass}
+                autoComplete="off"
+              />
+
+              {/* Dropdown suggestions */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-blue-200 rounded-xl shadow-lg overflow-hidden"
+                >
+                  {suggestions.map((book, idx) => (
+                    <button
+                      key={book.name}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectBook(book);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+                        idx === activeSuggestion
+                          ? 'bg-blue-100 text-blue-900'
+                          : 'hover:bg-blue-50 text-blue-800'
+                      }`}
+                    >
+                      <span className="font-medium">{book.name}</span>
+                      <span className="text-xs text-blue-400 ml-2">{book.testament}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Kapitel */}
+            <div className="flex-1">
+              <input
+                ref={chapterInputRef}
+                type="number"
+                min={1}
+                value={chapter}
+                onChange={(e) => handleChapterChange(e.target.value)}
+                onBlur={handleChapterBlur}
+                placeholder="Kap."
+                className={inputClass}
+              />
+            </div>
+
+            {/* Vers */}
+            <div className="flex-1">
+              <input
+                ref={verseInputRef}
+                type="text"
+                value={verse}
+                onChange={(e) => handleVerseChange(e.target.value)}
+                onBlur={handleVerseBlur}
+                placeholder="Vers"
+                className={inputClass}
+              />
+            </div>
           </div>
         </div>
 
