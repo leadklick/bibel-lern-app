@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { BIBLE_DE } from '@/lib/bible-data';
+import { BIBLE_BOOKS } from '@/lib/bible-books';
 
 // getbible.net translation codes for fallback
 const GETBIBLE_MAP: Record<string, string> = {
@@ -8,7 +10,7 @@ const GETBIBLE_MAP: Record<string, string> = {
   'HFA': 'schlachter',
 };
 
-// BibleGateway book name → getbible.net book number
+// BibleGateway book name → getbible.net book number (used in remote fallback only)
 const BOOK_NUMBER: Record<string, number> = {
   Genesis:1,Exodus:2,Levitikus:3,Numeri:4,Deuteronomium:5,Josua:6,Richter:7,
   Rut:8,Ruth:8,'1.Samuel':9,'1Samuel':9,'2.Samuel':10,'2Samuel':10,
@@ -29,6 +31,44 @@ const BOOK_NUMBER: Record<string, number> = {
   '1.Johannes':62,'1Johannes':62,'2.Johannes':63,'2Johannes':63,'3.Johannes':64,'3Johannes':64,
   Judas:65,Offenbarung:66,
 };
+
+/**
+ * Look up a verse in the locally embedded Schlachter Bible.
+ * ref format: "Genesis+1:1" or "Philipper+4:13" (BibleGateway-style bgName + chapter:verse)
+ * Returns the verse text or null if not found.
+ */
+function lookupLocalVerse(ref: string): string | null {
+  try {
+    // Decode and normalise: "Genesis+1:1" → "Genesis 1:1"
+    const decoded = decodeURIComponent(ref).replace(/\+/g, ' ');
+    const match = decoded.match(/^(.+?)\s+(\d+):(\d+)$/);
+    if (!match) return null;
+
+    const [, bookName, chapterStr, verseStr] = match;
+    const chapter = parseInt(chapterStr, 10);
+    const verse = parseInt(verseStr, 10);
+
+    // Resolve bookNumber from BIBLE_BOOKS using bgName or common name/abbrev
+    const bookEntry = BIBLE_BOOKS.find(
+      (b) =>
+        b.bgName === bookName ||
+        b.bgName.replace(/\./g, '') === bookName ||
+        b.name === bookName ||
+        b.abbrevs.some((a) => a === bookName) ||
+        // Handle common German aliases (e.g. "Psalm" for "Psalmen", "Hesekiel"/"Ezechiel")
+        (bookName === 'Psalm' && b.bookNumber === 19) ||
+        (bookName === 'Ezechiel' && b.bookNumber === 26) ||
+        (bookName === 'Zephanja' && b.bookNumber === 36)
+    );
+
+    if (!bookEntry) return null;
+
+    const bookNum = bookEntry.bookNumber;
+    return BIBLE_DE[bookNum]?.[chapter]?.[verse] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchFromBibleGateway(ref: string, version: string): Promise<string | null> {
   try {
@@ -106,7 +146,13 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'Missing ref parameter' }, { status: 400 });
   }
 
-  // Try BibleGateway first
+  // PRIMARY: look up in locally embedded Schlachter Bible (instant, 100% reliable)
+  const localText = lookupLocalVerse(ref);
+  if (localText) {
+    return Response.json({ text: localText });
+  }
+
+  // FALLBACK: Try BibleGateway
   let text = await fetchFromBibleGateway(ref, version);
 
   // Fallback: try LUT on BibleGateway if NGU failed (NGU doesn't cover full OT)
