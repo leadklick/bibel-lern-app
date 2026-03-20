@@ -64,7 +64,25 @@ function lookupLocalVerse(ref: string): string | null {
     if (!bookEntry) return null;
 
     const bookNum = bookEntry.bookNumber;
-    return BIBLE_DE[bookNum]?.[chapter]?.[verse] ?? null;
+    let text = BIBLE_DE[bookNum]?.[chapter]?.[verse] ?? null;
+    if (!text) return null;
+
+    // Remove psalm/song headers like "Ein Psalm Davids." or "Ein Lied..."
+    text = text.replace(/^(Ein (Psalm|Lied|Gebet|Maskil|Miktam)[^.]*\.\s*)+/i, '').trim();
+
+    // If the text contains a period followed by a capital letter and the real verse
+    // content starts after it, extract only the last meaningful sentence
+    // (handles cases where verse data bleeds in from previous verse)
+    const sentences = text.split(/(?<=[.!?»])\s+(?=[A-ZÄÖÜ])/);
+    if (sentences.length > 1) {
+      // Check if the last sentence is the "real" verse (shorter, standalone)
+      const lastSentence = sentences[sentences.length - 1];
+      if (lastSentence.length > 15 && lastSentence.length < text.length * 0.6) {
+        text = lastSentence.trim();
+      }
+    }
+
+    return text;
   } catch {
     return null;
   }
