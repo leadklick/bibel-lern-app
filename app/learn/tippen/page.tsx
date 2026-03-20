@@ -96,6 +96,18 @@ export default function TippenPage() {
   const verse = queue[index];
   const progress = (index / queue.length) * 100;
 
+  const handleSkip = () => {
+    const nextIndex = index + 1;
+    if (nextIndex >= queue.length) {
+      setPhase('done');
+    } else {
+      setIndex(nextIndex);
+      setInput('');
+      setWordResults([]);
+      setPhase('typing');
+    }
+  };
+
   const handleCheck = () => {
     const results = compareWords(verse.text, input);
     setWordResults(results);
@@ -133,9 +145,19 @@ export default function TippenPage() {
         >
           ← Zurück
         </button>
-        <span className="text-blue-500 text-sm font-medium">
-          {index + 1} / {queue.length}
-        </span>
+        <div className="flex items-center gap-3">
+          {phase === 'typing' && (
+            <button
+              onClick={handleSkip}
+              className="text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors min-h-[44px] flex items-center px-2"
+            >
+              Überspringen →
+            </button>
+          )}
+          <span className="text-blue-500 text-sm font-medium">
+            {index + 1} / {queue.length}
+          </span>
+        </div>
       </div>
 
       <ProgressBar value={progress} />

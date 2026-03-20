@@ -30,6 +30,11 @@ export default function VerseCard({ verse, onDelete, compact = false }: Props) {
               Gemeistert
             </span>
           )}
+          {verse.translation && (
+            <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-medium border border-indigo-100">
+              {verse.translation}
+            </span>
+          )}
           {verse.tags.map((tag) => (
             <span
               key={tag}

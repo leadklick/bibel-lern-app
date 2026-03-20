@@ -61,6 +61,16 @@ export default function FlashcardPage() {
     }
   };
 
+  const handleSkip = () => {
+    const nextIndex = index + 1;
+    if (nextIndex >= queue.length) {
+      setPhase('done');
+    } else {
+      setIndex(nextIndex);
+      setPhase('front');
+    }
+  };
+
   return (
     <div className="flex flex-col gap-5">
       {/* Header */}
@@ -71,9 +81,17 @@ export default function FlashcardPage() {
         >
           ← Zurück
         </button>
-        <span className="text-blue-500 text-sm font-medium">
-          {index + 1} / {queue.length}
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSkip}
+            className="text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors min-h-[44px] flex items-center px-2"
+          >
+            Überspringen →
+          </button>
+          <span className="text-blue-500 text-sm font-medium">
+            {index + 1} / {queue.length}
+          </span>
+        </div>
       </div>
 
       <ProgressBar value={progress} />

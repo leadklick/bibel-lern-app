@@ -11,6 +11,7 @@ export default function VersePage() {
   const [verses, setVerses] = useState<Verse[]>([]);
   const [filter, setFilter] = useState<'all' | 'due' | 'mastered'>('all');
   const [search, setSearch] = useState('');
+  const [translationFilter, setTranslationFilter] = useState<string>('all');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -33,11 +34,20 @@ export default function VersePage() {
     }
   };
 
+  // Collect unique translations present in the verse list
+  const availableTranslations = Array.from(
+    new Set(verses.map((v) => v.translation).filter(Boolean) as string[])
+  ).sort();
+
   const filtered = verses
     .filter((v) => {
       if (filter === 'due') return isDueToday(v);
       if (filter === 'mastered') return v.repetitions >= 5 && v.interval >= 21;
       return true;
+    })
+    .filter((v) => {
+      if (translationFilter === 'all') return true;
+      return (v.translation ?? '') === translationFilter;
     })
     .filter(
       (v) =>
@@ -90,12 +100,41 @@ export default function VersePage() {
         ))}
       </div>
 
+      {/* Translation filter — only shown when multiple translations exist */}
+      {availableTranslations.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setTranslationFilter('all')}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors min-h-[36px] ${
+              translationFilter === 'all'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+            }`}
+          >
+            Alle Übersetzungen
+          </button>
+          {availableTranslations.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTranslationFilter(t)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors min-h-[36px] ${
+                translationFilter === t
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Verse list */}
       {filtered.length === 0 ? (
         <div className="text-center text-blue-400 py-16">
           <p className="text-5xl mb-4">📖</p>
           <p className="text-base">Keine Verse gefunden.</p>
-          {filter === 'all' && search === '' && (
+          {filter === 'all' && search === '' && translationFilter === 'all' && (
             <Link
               href="/verse/add"
               className="mt-4 inline-block text-blue-600 underline text-sm"

@@ -48,6 +48,24 @@ export function getDueVerses(): Verse[] {
   return verses.filter((v) => v.nextReview <= endOfToday.getTime());
 }
 
+// ── Default Translation ───────────────────────────────────────────────────────
+
+const DEFAULT_TRANSLATION_KEY = 'bibel_default_translation';
+
+export function getDefaultTranslation(): string {
+  if (typeof window === 'undefined') return 'NGU';
+  try {
+    return localStorage.getItem(DEFAULT_TRANSLATION_KEY) ?? 'NGU';
+  } catch {
+    return 'NGU';
+  }
+}
+
+export function setDefaultTranslation(t: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(DEFAULT_TRANSLATION_KEY, t);
+}
+
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
 export function getStats(): AppStats {

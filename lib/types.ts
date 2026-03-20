@@ -3,6 +3,7 @@ export interface Verse {
   reference: string;
   text: string;
   tags: string[];
+  translation?: string;
   createdAt: number;
   // SM-2 fields
   interval: number;      // days until next review

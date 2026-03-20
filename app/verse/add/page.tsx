@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { addVerse } from '@/lib/storage';
+import { addVerse, getDefaultTranslation, setDefaultTranslation } from '@/lib/storage';
 import { Verse } from '@/lib/types';
 
 function generateId() {
@@ -12,13 +12,31 @@ function generateId() {
 const inputClass =
   'w-full border border-blue-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white min-h-[48px]';
 
+const TRANSLATIONS = [
+  { value: 'NGU', label: 'Neue Genfer Übersetzung (NGU)' },
+  { value: 'LB17', label: 'Lutherbibel 2017' },
+  { value: 'SCH2000', label: 'Schlachter 2000' },
+  { value: 'HFA', label: 'Hoffnung für alle' },
+  { value: 'Eigene', label: 'Eigene Übersetzung' },
+];
+
 export default function AddVersePage() {
   const router = useRouter();
   const [reference, setReference] = useState('');
   const [text, setText] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [translation, setTranslation] = useState('NGU');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTranslation(getDefaultTranslation());
+  }, []);
+
+  const handleTranslationChange = (value: string) => {
+    setTranslation(value);
+    setDefaultTranslation(value);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +64,7 @@ export default function AddVersePage() {
       reference: reference.trim(),
       text: text.trim(),
       tags,
+      translation,
       createdAt: now,
       interval: 1,
       repetitions: 0,
@@ -101,6 +120,23 @@ export default function AddVersePage() {
             rows={5}
             className={`${inputClass} resize-none h-auto`}
           />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-base font-semibold text-blue-800">
+            Übersetzung
+          </label>
+          <select
+            value={translation}
+            onChange={(e) => handleTranslationChange(e.target.value)}
+            className={inputClass}
+          >
+            {TRANSLATIONS.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex flex-col gap-1.5">
