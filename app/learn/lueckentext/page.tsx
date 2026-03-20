@@ -6,10 +6,10 @@ import { getDueVerses, getVerses, updateVerse, recordStudySession } from '@/lib/
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import ProgressBar from '@/components/ProgressBar';
+import Confetti from '@/components/Confetti';
 
-type Phase = 'exercise' | 'result' | 'rate' | 'done';
+type Phase = 'exercise' | 'result' | 'done';
 
-/** Match result for a single blank */
 type MatchResult = 'correct' | 'almost' | 'wrong' | null;
 
 interface BlankWord {
@@ -19,7 +19,13 @@ interface BlankWord {
   correct: MatchResult;
 }
 
-/** Levenshtein distance between two strings */
+interface SessionResult {
+  total: number;
+  known: number;
+  almost: number;
+  unknown: number;
+}
+
 function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
@@ -38,13 +44,6 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-/**
- * Fuzzy-match a user answer against the expected word.
- * Returns 'correct' | 'almost' | 'wrong'.
- *  - 'correct'  — exact match (after normalization)
- *  - 'almost'   — Levenshtein distance ≤ 2 for words ≥5 chars, or ≤1 for shorter words
- *  - 'wrong'    — everything else
- */
 function fuzzyMatch(expected: string, given: string): MatchResult {
   const normalize = (s: string) =>
     s.trim().toLowerCase().replace(/[.,;:!?»«„""'']+/g, '');
@@ -63,7 +62,6 @@ function fuzzyMatch(expected: string, given: string): MatchResult {
 
 function buildBlanks(text: string): BlankWord[] {
   const words = text.split(/\s+/);
-  // Blank every 4th word and every word longer than 4 chars probabilistically
   return words.map((word, i) => {
     const clean = word.replace(/[.,;:!?»«„"]+$/g, '');
     const shouldBlank = clean.length > 3 && (i % 4 === 3 || i % 7 === 5);
@@ -78,6 +76,12 @@ export default function LueckentextPage() {
   const [phase, setPhase] = useState<Phase>('exercise');
   const [blanks, setBlanks] = useState<BlankWord[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [sessionResult, setSessionResult] = useState<SessionResult>({
+    total: 0,
+    known: 0,
+    almost: 0,
+    unknown: 0,
+  });
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -91,39 +95,98 @@ export default function LueckentextPage() {
 
   if (!mounted) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <span className="text-blue-400 animate-pulse">Lädt…</span>
+      <div className="flex flex-col gap-5 page-enter">
+        <div className="skeleton h-10 rounded-xl" />
+        <div className="skeleton h-3 rounded-full" />
+        <div className="skeleton h-8 w-48 mx-auto rounded-xl" />
+        <div className="skeleton h-48 rounded-2xl" />
+        <div className="skeleton h-14 rounded-xl" />
       </div>
     );
   }
 
   if (queue.length === 0) {
     return (
-      <div className="text-center py-20">
-        <p className="text-5xl mb-4">📖</p>
-        <p className="text-blue-800 font-semibold">Keine Verse vorhanden</p>
+      <div className="text-center py-20 page-enter">
+        <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-5xl mx-auto mb-4">
+          📖
+        </div>
+        <p className="text-blue-800 font-bold text-xl mb-2">Keine Verse vorhanden</p>
+        <p className="text-blue-400 text-sm mb-6">Füge zuerst Verse hinzu.</p>
         <button
           onClick={() => router.push('/learn')}
-          className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors min-h-[48px]"
+          className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors min-h-[48px]"
         >
-          Zurück
+          Zurück zum Menü
         </button>
       </div>
     );
   }
 
   if (phase === 'done') {
+    const allKnown = sessionResult.unknown === 0 && sessionResult.almost === 0;
+    const mostlyKnown = sessionResult.known / sessionResult.total >= 0.7;
+    const motivational = allKnown
+      ? 'Perfekt! Alle Lücken richtig ausgefüllt!'
+      : mostlyKnown
+      ? 'Sehr gut! Du kennst die meisten Verse schon sehr gut.'
+      : 'Gut geübt! Mit jeder Wiederholung wird es leichter.';
+
     return (
-      <div className="text-center py-20">
-        <p className="text-5xl mb-4">🎉</p>
-        <p className="text-blue-800 font-semibold text-xl mb-2">Alle Verse geschafft!</p>
-        <p className="text-blue-500 text-sm mb-6">Gut gemacht! Deine Fortschritte wurden gespeichert.</p>
-        <button
-          onClick={() => router.push('/learn')}
-          className="w-full md:w-auto bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors text-base min-h-[56px]"
-        >
-          Zurück zum Menü
-        </button>
+      <div className="flex flex-col gap-6 page-enter text-center">
+        {allKnown && <Confetti />}
+        <div>
+          <p className="text-5xl mb-3">{allKnown ? '🏆' : mostlyKnown ? '🎉' : '💪'}</p>
+          <h2 className="text-2xl font-bold text-blue-900 mb-1">Alle Verse geschafft!</h2>
+          <p className="text-blue-500 text-sm">{motivational}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 text-left">
+          <p className="text-xs text-blue-400 uppercase tracking-widest font-medium mb-4 text-center">
+            Ergebnis
+          </p>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-green-50 rounded-xl p-3">
+              <p className="text-2xl font-bold text-green-700">{sessionResult.known}</p>
+              <p className="text-xs text-green-600 font-medium mt-0.5">Gewusst ✅</p>
+            </div>
+            <div className="bg-yellow-50 rounded-xl p-3">
+              <p className="text-2xl font-bold text-yellow-700">{sessionResult.almost}</p>
+              <p className="text-xs text-yellow-600 font-medium mt-0.5">Fast 😐</p>
+            </div>
+            <div className="bg-red-50 rounded-xl p-3">
+              <p className="text-2xl font-bold text-red-700">{sessionResult.unknown}</p>
+              <p className="text-xs text-red-600 font-medium mt-0.5">Nicht gewusst ❌</p>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-blue-50 text-center">
+            <p className="text-blue-500 text-sm">
+              <strong className="text-blue-800">{sessionResult.total}</strong> Verse insgesamt wiederholt
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => {
+              const due = getDueVerses();
+              const all = getVerses();
+              const q = due.length > 0 ? due : all;
+              setQueue(q);
+              setIndex(0);
+              if (q.length > 0) setBlanks(buildBlanks(q[0].text));
+              setPhase('exercise');
+              setSessionResult({ total: 0, known: 0, almost: 0, unknown: 0 });
+            }}
+            className="w-full bg-blue-600 text-white font-semibold py-4 rounded-xl hover:bg-blue-700 transition-colors text-base min-h-[52px] active:scale-[0.98]"
+          >
+            Nochmal üben
+          </button>
+          <button
+            onClick={() => router.push('/learn')}
+            className="w-full bg-white border border-blue-200 text-blue-700 font-semibold py-4 rounded-xl hover:bg-blue-50 transition-colors text-base min-h-[52px] active:scale-[0.98]"
+          >
+            Zurück zum Menü
+          </button>
+        </div>
       </div>
     );
   }
@@ -157,6 +220,14 @@ export default function LueckentextPage() {
     updateVerse(updated);
     recordStudySession();
 
+    const ratingLabel = rating >= 5 ? 'known' : rating >= 3 ? 'almost' : 'unknown';
+    setSessionResult((prev) => ({
+      total: prev.total + 1,
+      known: prev.known + (ratingLabel === 'known' ? 1 : 0),
+      almost: prev.almost + (ratingLabel === 'almost' ? 1 : 0),
+      unknown: prev.unknown + (ratingLabel === 'unknown' ? 1 : 0),
+    }));
+
     const nextIndex = index + 1;
     if (nextIndex >= queue.length) {
       setPhase('done');
@@ -171,12 +242,11 @@ export default function LueckentextPage() {
     (b) => b.isBlank && (b.correct === 'correct' || b.correct === 'almost')
   ).length;
   const totalBlanks = blanks.filter((b) => b.isBlank).length;
-  // Snap to valid rating values (1, 3, 5)
   const rawRating = totalBlanks === 0 ? 5 : Math.max(1, Math.round((correctCount / totalBlanks) * 5));
   const autoRating = rawRating <= 1 ? 1 : rawRating <= 3 ? 3 : 5;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 page-enter">
       {/* Header */}
       <div className="flex items-center justify-between">
         <button
@@ -200,11 +270,23 @@ export default function LueckentextPage() {
         </div>
       </div>
 
-      <ProgressBar value={progress} />
+      <ProgressBar value={progress} showPercent />
 
-      {/* Verse reference */}
-      <div className="text-center">
+      {/* Verse reference + tags */}
+      <div className="text-center flex flex-col items-center gap-2">
         <span className="font-bold text-blue-900 text-xl md:text-2xl">{verse.reference}</span>
+        {verse.tags.length > 0 && (
+          <div className="flex gap-2 flex-wrap justify-center">
+            {verse.tags.map((tag) => (
+              <span
+                key={tag}
+                className="text-xs bg-blue-50 text-blue-500 px-3 py-1 rounded-full border border-blue-100"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Blanks */}
@@ -251,7 +333,6 @@ export default function LueckentextPage() {
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      // Focus next blank
                       const nextBlankIdx = blanks.findIndex((b2, j) => j > i && b2.isBlank);
                       if (nextBlankIdx >= 0) inputRefs.current[nextBlankIdx]?.focus();
                     }
@@ -305,7 +386,7 @@ export default function LueckentextPage() {
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-sm bg-yellow-200 inline-block" />
-            Fast richtig (Tippfehler)
+            Fast richtig
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-sm bg-red-200 inline-block" />
@@ -318,7 +399,7 @@ export default function LueckentextPage() {
       {phase === 'exercise' && (
         <button
           onClick={handleCheck}
-          className="w-full bg-blue-600 text-white font-semibold py-4 rounded-xl hover:bg-blue-700 transition-colors text-base min-h-[56px]"
+          className="w-full bg-blue-600 text-white font-semibold py-4 rounded-xl hover:bg-blue-700 transition-colors text-base min-h-[56px] active:scale-[0.98]"
         >
           Überprüfen
         </button>
@@ -355,7 +436,7 @@ function RatingButtons({
         <button
           key={value}
           onClick={() => onRate(value)}
-          className={`${color} rounded-xl py-4 font-semibold transition-colors flex flex-col items-center gap-2 min-h-[80px] ${
+          className={`${color} rounded-xl py-4 font-semibold transition-colors flex flex-col items-center gap-2 min-h-[80px] active:scale-95 ${
             suggested === value ? 'ring-2 ring-offset-1 ring-blue-400' : ''
           }`}
         >

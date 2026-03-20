@@ -6,6 +6,7 @@ import { getDueVerses, getVerses, updateVerse, recordStudySession } from '@/lib/
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import ProgressBar from '@/components/ProgressBar';
+import Confetti from '@/components/Confetti';
 
 type Phase = 'typing' | 'result' | 'rate' | 'done';
 
@@ -13,6 +14,13 @@ interface WordResult {
   expected: string;
   given: string;
   correct: boolean;
+}
+
+interface SessionResult {
+  total: number;
+  known: number;
+  almost: number;
+  unknown: number;
 }
 
 function compareWords(expected: string, given: string): WordResult[] {
@@ -46,6 +54,12 @@ export default function TippenPage() {
   const [input, setInput] = useState('');
   const [wordResults, setWordResults] = useState<WordResult[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [sessionResult, setSessionResult] = useState<SessionResult>({
+    total: 0,
+    known: 0,
+    almost: 0,
+    unknown: 0,
+  });
 
   useEffect(() => {
     const due = getDueVerses();
@@ -79,17 +93,20 @@ export default function TippenPage() {
 
   if (phase === 'done') {
     return (
-      <div className="text-center py-20">
-        <p className="text-5xl mb-4">🎉</p>
-        <p className="text-blue-800 font-semibold text-xl mb-2">Alle Verse getippt!</p>
-        <p className="text-blue-500 text-sm mb-6">Gut gemacht! Deine Fortschritte wurden gespeichert.</p>
-        <button
-          onClick={() => router.push('/learn')}
-          className="w-full md:w-auto bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors text-base min-h-[56px]"
-        >
-          Zurück zum Menü
-        </button>
-      </div>
+      <SummaryScreen
+        result={sessionResult}
+        onBack={() => router.push('/learn')}
+        onAgain={() => {
+          const due = getDueVerses();
+          const all = getVerses();
+          setQueue(due.length > 0 ? due : all);
+          setIndex(0);
+          setInput('');
+          setWordResults([]);
+          setPhase('typing');
+          setSessionResult({ total: 0, known: 0, almost: 0, unknown: 0 });
+        }}
+      />
     );
   }
 
@@ -118,6 +135,14 @@ export default function TippenPage() {
     const updated = applyReview(verse, rating);
     updateVerse(updated);
     recordStudySession();
+
+    const ratingLabel = rating >= 5 ? 'known' : rating >= 3 ? 'almost' : 'unknown';
+    setSessionResult((prev) => ({
+      total: prev.total + 1,
+      known: prev.known + (ratingLabel === 'known' ? 1 : 0),
+      almost: prev.almost + (ratingLabel === 'almost' ? 1 : 0),
+      unknown: prev.unknown + (ratingLabel === 'unknown' ? 1 : 0),
+    }));
 
     const nextIndex = index + 1;
     if (nextIndex >= queue.length) {
@@ -267,6 +292,77 @@ function RatingButtons({
           <span className="text-sm leading-tight text-center">{label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+function SummaryScreen({
+  result,
+  onBack,
+  onAgain,
+}: {
+  result: SessionResult;
+  onBack: () => void;
+  onAgain: () => void;
+}) {
+  const allKnown = result.unknown === 0 && result.almost === 0;
+  const mostlyKnown = result.total > 0 && result.known / result.total >= 0.7;
+
+  const motivational = allKnown
+    ? 'Perfekt! Alle Verse aus dem Gedächtnis getippt!'
+    : mostlyKnown
+    ? 'Sehr gut! Du kennst die meisten Verse schon ausgezeichnet.'
+    : 'Gut geübt! Regelmäßiges Wiederholen bringt dich ans Ziel.';
+
+  return (
+    <div className="flex flex-col gap-6 page-enter text-center">
+      {allKnown && <Confetti />}
+
+      <div>
+        <p className="text-5xl mb-3">{allKnown ? '🏆' : mostlyKnown ? '🎉' : '💪'}</p>
+        <h2 className="text-2xl font-bold text-blue-900 mb-1">Session abgeschlossen!</h2>
+        <p className="text-blue-500 text-sm">{motivational}</p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 text-left">
+        <p className="text-xs text-blue-400 uppercase tracking-widest font-medium mb-4 text-center">
+          Ergebnis
+        </p>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="bg-green-50 rounded-xl p-3">
+            <p className="text-2xl font-bold text-green-700">{result.known}</p>
+            <p className="text-xs text-green-600 font-medium mt-0.5">Gewusst ✅</p>
+          </div>
+          <div className="bg-yellow-50 rounded-xl p-3">
+            <p className="text-2xl font-bold text-yellow-700">{result.almost}</p>
+            <p className="text-xs text-yellow-600 font-medium mt-0.5">Fast 😐</p>
+          </div>
+          <div className="bg-red-50 rounded-xl p-3">
+            <p className="text-2xl font-bold text-red-700">{result.unknown}</p>
+            <p className="text-xs text-red-600 font-medium mt-0.5">Nicht gewusst ❌</p>
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-blue-50 text-center">
+          <p className="text-blue-500 text-sm">
+            <strong className="text-blue-800">{result.total}</strong> Verse insgesamt wiederholt
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={onAgain}
+          className="w-full bg-blue-600 text-white font-semibold py-4 rounded-xl hover:bg-blue-700 transition-colors text-base min-h-[52px] active:scale-[0.98]"
+        >
+          Nochmal üben
+        </button>
+        <button
+          onClick={onBack}
+          className="w-full bg-white border border-blue-200 text-blue-700 font-semibold py-4 rounded-xl hover:bg-blue-50 transition-colors text-base min-h-[52px] active:scale-[0.98]"
+        >
+          Zurück zum Menü
+        </button>
+      </div>
     </div>
   );
 }

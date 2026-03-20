@@ -56,7 +56,9 @@ export default function VerseCard({ verse, onDelete, compact = false }: Props) {
       </div>
 
       {!compact && (
-        <p className="text-gray-700 text-sm md:text-base leading-relaxed">{verse.text}</p>
+        <p className="text-gray-700 text-sm md:text-base leading-relaxed">
+          {verse.text.length > 80 ? verse.text.slice(0, 80) + '…' : verse.text}
+        </p>
       )}
 
       <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5 flex-wrap">

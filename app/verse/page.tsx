@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { getVerses, deleteVerse } from '@/lib/storage';
 import { Verse } from '@/lib/types';
 import VerseCard from '@/components/VerseCard';
-import { isDueToday } from '@/lib/sm2';
+import { isDueToday, isMastered } from '@/lib/sm2';
+import Toast from '@/components/Toast';
 
 export default function VersePage() {
   const [verses, setVerses] = useState<Verse[]>([]);
@@ -13,6 +14,7 @@ export default function VersePage() {
   const [search, setSearch] = useState('');
   const [translationFilter, setTranslationFilter] = useState<string>('all');
   const [mounted, setMounted] = useState(false);
+  const [showDeleteToast, setShowDeleteToast] = useState(false);
 
   useEffect(() => {
     setVerses(getVerses());
@@ -21,8 +23,16 @@ export default function VersePage() {
 
   if (!mounted) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <span className="text-blue-400 animate-pulse">Lädt…</span>
+      <div className="flex flex-col gap-5 page-enter">
+        <div className="flex items-center justify-between">
+          <div className="skeleton h-8 w-36 rounded-xl" />
+          <div className="skeleton h-10 w-32 rounded-full" />
+        </div>
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="skeleton h-10 rounded-full" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton h-28 rounded-2xl" />
+        ))}
       </div>
     );
   }
@@ -31,6 +41,7 @@ export default function VersePage() {
     if (confirm('Vers wirklich löschen?')) {
       deleteVerse(id);
       setVerses(getVerses());
+      setShowDeleteToast(true);
     }
   };
 
@@ -42,7 +53,7 @@ export default function VersePage() {
   const filtered = verses
     .filter((v) => {
       if (filter === 'due') return isDueToday(v);
-      if (filter === 'mastered') return v.repetitions >= 5 && v.interval >= 21;
+      if (filter === 'mastered') return isMastered(v);
       return true;
     })
     .filter((v) => {
@@ -56,13 +67,51 @@ export default function VersePage() {
         v.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
     );
 
+  // Group by tag when showing all with no search/translation filter
+  const shouldGroup =
+    filter === 'all' && search === '' && translationFilter === 'all';
+
+  // Build grouped structure
+  const groups: { tag: string; verses: Verse[] }[] = [];
+  if (shouldGroup && filtered.length > 0) {
+    const tagMap = new Map<string, Verse[]>();
+    const noTag: Verse[] = [];
+    for (const v of filtered) {
+      if (v.tags.length === 0) {
+        noTag.push(v);
+      } else {
+        // Use first tag as group key
+        const tag = v.tags[0];
+        if (!tagMap.has(tag)) tagMap.set(tag, []);
+        tagMap.get(tag)!.push(v);
+      }
+    }
+    for (const [tag, vvs] of tagMap) {
+      groups.push({ tag, verses: vvs });
+    }
+    if (noTag.length > 0) {
+      groups.push({ tag: 'Weitere Verse', verses: noTag });
+    }
+    groups.sort((a, b) => a.tag.localeCompare(b.tag, 'de'));
+  }
+
+  const dueCount = verses.filter(isDueToday).length;
+  const masteredCount = verses.filter(isMastered).length;
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 page-enter">
+      {showDeleteToast && (
+        <Toast
+          message="Vers gelöscht"
+          type="info"
+          onDone={() => setShowDeleteToast(false)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl md:text-3xl font-bold text-blue-900">Meine Verse</h1>
         <Link
           href="/verse/add"
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors min-h-[44px] flex items-center"
+          className="bg-blue-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors min-h-[44px] flex items-center active:scale-95"
         >
           + Hinzufügen
         </Link>
@@ -71,7 +120,7 @@ export default function VersePage() {
       {/* Search */}
       <input
         type="text"
-        placeholder="Suchen…"
+        placeholder="Suchen nach Bibelstelle, Text oder Tag…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="w-full border border-blue-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white min-h-[48px]"
@@ -81,11 +130,11 @@ export default function VersePage() {
       <div className="flex gap-2">
         {(
           [
-            ['all', 'Alle'],
-            ['due', 'Fällig'],
-            ['mastered', 'Gemeistert'],
+            ['all', 'Alle', verses.length],
+            ['due', 'Fällig', dueCount],
+            ['mastered', 'Gemeistert', masteredCount],
           ] as const
-        ).map(([value, label]) => (
+        ).map(([value, label, count]) => (
           <button
             key={value}
             onClick={() => setFilter(value)}
@@ -96,6 +145,15 @@ export default function VersePage() {
             }`}
           >
             {label}
+            <span
+              className={`ml-1.5 text-xs font-medium rounded-full px-1.5 py-0.5 ${
+                filter === value
+                  ? 'bg-blue-500 text-blue-100'
+                  : 'bg-blue-100 text-blue-500'
+              }`}
+            >
+              {count}
+            </span>
           </button>
         ))}
       </div>
@@ -131,17 +189,28 @@ export default function VersePage() {
 
       {/* Verse list */}
       {filtered.length === 0 ? (
-        <div className="text-center text-blue-400 py-16">
-          <p className="text-5xl mb-4">📖</p>
-          <p className="text-base">Keine Verse gefunden.</p>
-          {filter === 'all' && search === '' && translationFilter === 'all' && (
-            <Link
-              href="/verse/add"
-              className="mt-4 inline-block text-blue-600 underline text-sm"
-            >
-              Ersten Vers hinzufügen
-            </Link>
-          )}
+        <EmptyState filter={filter} search={search} translationFilter={translationFilter} />
+      ) : shouldGroup ? (
+        // Grouped view
+        <div className="flex flex-col gap-6">
+          {groups.map(({ tag, verses: groupVerses }) => (
+            <div key={tag} className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">
+                  {tag}
+                </span>
+                <span className="text-xs text-blue-300 font-medium">
+                  {groupVerses.length}
+                </span>
+                <div className="flex-1 h-px bg-blue-100" />
+              </div>
+              <div className="flex flex-col gap-3">
+                {groupVerses.map((verse) => (
+                  <VerseCard key={verse.id} verse={verse} onDelete={handleDelete} />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -150,6 +219,71 @@ export default function VersePage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function EmptyState({
+  filter,
+  search,
+  translationFilter,
+}: {
+  filter: 'all' | 'due' | 'mastered';
+  search: string;
+  translationFilter: string;
+}) {
+  if (filter === 'all' && search === '' && translationFilter === 'all') {
+    return (
+      <div className="text-center py-16 flex flex-col items-center gap-4">
+        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-4xl">
+          📖
+        </div>
+        <div>
+          <p className="text-blue-800 font-bold text-xl mb-1">Noch keine Verse</p>
+          <p className="text-blue-400 text-sm">
+            Füge deinen ersten Bibelvers hinzu und starte deine Lernreise.
+          </p>
+        </div>
+        <Link
+          href="/verse/add"
+          className="bg-blue-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors min-h-[48px] flex items-center active:scale-95"
+        >
+          Ersten Vers hinzufügen →
+        </Link>
+      </div>
+    );
+  }
+
+  if (filter === 'due') {
+    return (
+      <div className="text-center py-16 flex flex-col items-center gap-3">
+        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center text-4xl">
+          ✅
+        </div>
+        <p className="text-green-700 font-bold text-xl">Alles erledigt!</p>
+        <p className="text-green-600 text-sm">Keine fälligen Verse für heute.</p>
+      </div>
+    );
+  }
+
+  if (filter === 'mastered') {
+    return (
+      <div className="text-center py-16 flex flex-col items-center gap-3">
+        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-4xl">
+          🏆
+        </div>
+        <p className="text-blue-800 font-bold text-xl">Noch nichts gemeistert</p>
+        <p className="text-blue-400 text-sm">
+          Lerne regelmäßig und du wirst bald Verse meistern!
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-center text-blue-400 py-16">
+      <p className="text-5xl mb-4">🔍</p>
+      <p className="text-base">Keine Verse gefunden.</p>
     </div>
   );
 }

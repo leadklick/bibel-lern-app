@@ -4,8 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { addVerse, getDefaultTranslation, setDefaultTranslation } from '@/lib/storage';
 import { Verse } from '@/lib/types';
-import { searchBooks, BIBLE_BOOKS, BibleBook } from '@/lib/bible-books';
+import { searchBooks, BibleBook } from '@/lib/bible-books';
 import { autoTags } from '@/lib/auto-tags';
+import Toast from '@/components/Toast';
 
 function generateId() {
   return `verse-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -25,7 +26,6 @@ const TRANSLATIONS = [
 export default function AddVersePage() {
   const router = useRouter();
 
-  // 3-field reference state
   const [bookInput, setBookInput] = useState('');
   const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null);
   const [chapter, setChapter] = useState('');
@@ -37,13 +37,12 @@ export default function AddVersePage() {
   const [translation, setTranslation] = useState('NGU');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
-  // Autocomplete state
   const [suggestions, setSuggestions] = useState<BibleBook[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
 
-  // Verse fetch state
   const [fetchingVerse, setFetchingVerse] = useState(false);
   const [verseFetched, setVerseFetched] = useState(false);
 
@@ -53,6 +52,7 @@ export default function AddVersePage() {
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const lastFetchedRef = useRef<string>('');
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setTranslation(getDefaultTranslation());
@@ -63,13 +63,11 @@ export default function AddVersePage() {
     setDefaultTranslation(value);
   };
 
-  // Build the combined reference string: "Buch Kapitel,Vers"
   function buildReference(book: BibleBook | null, chap: string, ver: string): string {
     if (!book || !chap || !ver) return '';
     return `${book.name} ${chap},${ver}`;
   }
 
-  // Build BibleGateway ref for API call
   function buildBgRef(book: BibleBook | null, chap: string, ver: string): string | null {
     if (!book || !chap || !ver) return null;
     return `${book.bgName}+${chap}:${ver}`;
@@ -83,7 +81,7 @@ export default function AddVersePage() {
       const translationObj = TRANSLATIONS.find((t) => t.value === translation);
       const bgVersion = translationObj?.bgVersion ?? 'NGU-DE';
 
-      if (!bgVersion) return; // "Eigene" — skip fetch
+      if (!bgVersion) return;
 
       setFetchingVerse(true);
       setVerseFetched(false);
@@ -96,11 +94,14 @@ export default function AddVersePage() {
         if (data.text) {
           setText(data.text);
           setVerseFetched(true);
-          // Auto-suggest tags based on book and fetched verse text
           if (selectedBook) {
             const suggested = autoTags(selectedBook.name, data.text);
             setTags(suggested);
           }
+          // Auto-scroll to save button
+          setTimeout(() => {
+            saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 150);
         }
       } catch {
         // silently fail — user can type manually
@@ -112,7 +113,6 @@ export default function AddVersePage() {
     [translation, selectedBook]
   );
 
-  // Attempt auto-fetch when all three fields are set
   const tryAutoFetch = useCallback(
     (book: BibleBook | null, chap: string, ver: string) => {
       const bgRef = buildBgRef(book, chap, ver);
@@ -123,7 +123,6 @@ export default function AddVersePage() {
     [fetchVerseText]
   );
 
-  // Book input change
   const handleBookInputChange = (val: string) => {
     setBookInput(val);
     setSelectedBook(null);
@@ -147,7 +146,6 @@ export default function AddVersePage() {
     setSuggestions([]);
     setShowSuggestions(false);
     setActiveSuggestion(-1);
-    // Move focus to Kapitel field
     setTimeout(() => {
       chapterInputRef.current?.focus();
     }, 0);
@@ -170,7 +168,6 @@ export default function AddVersePage() {
     }
   };
 
-  // Chapter field handlers
   const handleChapterChange = (val: string) => {
     setChapter(val);
     setVerseFetched(false);
@@ -181,7 +178,6 @@ export default function AddVersePage() {
     tryAutoFetch(selectedBook, chapter, verse);
   };
 
-  // Verse field handlers
   const handleVerseChange = (val: string) => {
     setVerse(val);
     setVerseFetched(false);
@@ -192,7 +188,6 @@ export default function AddVersePage() {
     tryAutoFetch(selectedBook, chapter, verse);
   };
 
-  // Also try fetch when verse field gets a value and all others are filled
   useEffect(() => {
     if (selectedBook && chapter && verse) {
       tryAutoFetch(selectedBook, chapter, verse);
@@ -200,7 +195,6 @@ export default function AddVersePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verse, selectedBook, chapter]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -216,7 +210,6 @@ export default function AddVersePage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Tag pill helpers
   const removeTag = (tagToRemove: string) => {
     setTags((prev) => prev.filter((t) => t !== tagToRemove));
   };
@@ -224,7 +217,6 @@ export default function AddVersePage() {
   const addTag = (raw: string) => {
     const trimmed = raw.trim();
     if (!trimmed) return;
-    // Support comma-separated input
     const parts = trimmed.split(',').map((p) => p.trim()).filter(Boolean);
     setTags((prev) => {
       const combined = [...prev];
@@ -247,11 +239,13 @@ export default function AddVersePage() {
     }
   };
 
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const charCount = text.length;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Flush any pending tag input
     const pendingTag = tagInputValue.trim();
     const finalTags = pendingTag
       ? [...tags, ...pendingTag.split(',').map((t) => t.trim()).filter(Boolean)].filter(
@@ -266,7 +260,7 @@ export default function AddVersePage() {
       return;
     }
     if (!text.trim()) {
-      setError('Verstext konnte nicht geladen werden. Bitte prüfe die Bibelstelle.');
+      setError('Verstext konnte nicht geladen werden. Bitte prüfe die Bibelstelle oder gib den Text manuell ein.');
       return;
     }
 
@@ -290,11 +284,19 @@ export default function AddVersePage() {
     };
 
     addVerse(verseObj);
-    router.push('/verse');
+    setShowToast(true);
+
+    setTimeout(() => {
+      router.push('/verse');
+    }, 1400);
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 page-enter">
+      {showToast && (
+        <Toast message="Vers gespeichert! ✓" type="success" />
+      )}
+
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.back()}
@@ -333,7 +335,6 @@ export default function AddVersePage() {
                 autoComplete="off"
               />
 
-              {/* Dropdown suggestions */}
               {showSuggestions && suggestions.length > 0 && (
                 <div
                   ref={suggestionsRef}
@@ -399,10 +400,38 @@ export default function AddVersePage() {
               </div>
             )}
             {text && !fetchingVerse && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                <p className="text-xs text-green-500 font-medium mb-1">Vers geladen</p>
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">
+                    Vers geladen ✓
+                  </p>
+                  <span className="text-xs text-green-500">
+                    {wordCount} Wörter · {charCount} Zeichen
+                  </span>
+                </div>
                 <p className="text-gray-700 text-base leading-relaxed">{text}</p>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Manual text fallback */}
+        {!fetchingVerse && !verseFetched && translation === 'Eigene' && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-base font-semibold text-blue-800">
+              Verstext <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Gib den Verstext ein…"
+              rows={4}
+              className="w-full border border-blue-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white resize-none"
+            />
+            {text && (
+              <p className="text-xs text-blue-400 text-right">
+                {wordCount} Wörter · {charCount} Zeichen
+              </p>
             )}
           </div>
         )}
@@ -424,13 +453,13 @@ export default function AddVersePage() {
           </select>
         </div>
 
-        {/* Tags / Kategorien — pill UI */}
+        {/* Tags / Kategorien */}
         <div className="flex flex-col gap-1.5">
           <label className="text-base font-semibold text-blue-800">
             Tags / Kategorien
           </label>
           <p className="text-xs text-blue-400">
-            Werden automatisch vorgeschlagen. Tippe zum Hinzufügen, Enter oder Komma zum Bestätigen.
+            Werden automatisch vorgeschlagen. Tippe und bestätige mit Enter oder Komma.
           </p>
 
           <div
@@ -472,17 +501,19 @@ export default function AddVersePage() {
         </div>
 
         {error && (
-          <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-xl p-3">
-            {error}
-          </p>
+          <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+            <span className="shrink-0 mt-0.5">⚠️</span>
+            <p>{error}</p>
+          </div>
         )}
 
         <button
+          ref={saveButtonRef}
           type="submit"
-          disabled={saving}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-4 rounded-xl transition-colors text-base min-h-[52px]"
+          disabled={saving || fetchingVerse}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-xl transition-colors text-base min-h-[52px] active:scale-[0.98]"
         >
-          {saving ? 'Speichere…' : 'Vers speichern'}
+          {saving ? 'Wird gespeichert…' : fetchingVerse ? 'Vers wird geladen…' : 'Vers speichern'}
         </button>
       </form>
     </div>
