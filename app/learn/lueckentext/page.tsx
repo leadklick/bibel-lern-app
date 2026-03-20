@@ -171,7 +171,9 @@ export default function LueckentextPage() {
     (b) => b.isBlank && (b.correct === 'correct' || b.correct === 'almost')
   ).length;
   const totalBlanks = blanks.filter((b) => b.isBlank).length;
-  const autoRating = totalBlanks === 0 ? 5 : Math.max(1, Math.round((correctCount / totalBlanks) * 5));
+  // Snap to valid rating values (1, 3, 5)
+  const rawRating = totalBlanks === 0 ? 5 : Math.max(1, Math.round((correctCount / totalBlanks) * 5));
+  const autoRating = rawRating <= 1 ? 1 : rawRating <= 3 ? 3 : 5;
 
   return (
     <div className="flex flex-col gap-5">

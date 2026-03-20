@@ -133,7 +133,9 @@ export default function TippenPage() {
   const correctCount = wordResults.filter((w) => w.correct).length;
   const totalWords = wordResults.length;
   const accuracy = totalWords > 0 ? Math.round((correctCount / totalWords) * 100) : 0;
-  const autoRating = Math.max(1, Math.round(accuracy / 20));
+  // Snap to valid rating values (1, 3, 5)
+  const rawRating = Math.max(1, Math.round(accuracy / 20));
+  const autoRating = rawRating <= 1 ? 1 : rawRating <= 3 ? 3 : 5;
 
   return (
     <div className="flex flex-col gap-5">
