@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { addVerse, getDefaultTranslation, setDefaultTranslation } from '@/lib/storage';
 import { Verse } from '@/lib/types';
+import { searchBooks, parseReference, BibleBook } from '@/lib/bible-books';
 
 function generateId() {
   return `verse-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -13,11 +14,11 @@ const inputClass =
   'w-full border border-blue-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white min-h-[48px]';
 
 const TRANSLATIONS = [
-  { value: 'NGU', label: 'Neue Genfer Übersetzung (NGU)' },
-  { value: 'LB17', label: 'Lutherbibel 2017' },
-  { value: 'SCH2000', label: 'Schlachter 2000' },
-  { value: 'HFA', label: 'Hoffnung für alle' },
-  { value: 'Eigene', label: 'Eigene Übersetzung' },
+  { value: 'NGU', label: 'Neue Genfer Übersetzung (NGU)', bgVersion: 'NGU-DE' },
+  { value: 'LB17', label: 'Lutherbibel 2017', bgVersion: 'LUT' },
+  { value: 'SCH2000', label: 'Schlachter 2000', bgVersion: 'SCH2000' },
+  { value: 'HFA', label: 'Hoffnung für alle', bgVersion: 'HFA' },
+  { value: 'Eigene', label: 'Eigene Übersetzung', bgVersion: null },
 ];
 
 export default function AddVersePage() {
@@ -29,6 +30,20 @@ export default function AddVersePage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<BibleBook[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+
+  // Verse fetch state
+  const [fetchingVerse, setFetchingVerse] = useState(false);
+  const [verseFetched, setVerseFetched] = useState(false);
+
+  const refInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchedRef = useRef<string>('');
+
   useEffect(() => {
     setTranslation(getDefaultTranslation());
   }, []);
@@ -37,6 +52,126 @@ export default function AddVersePage() {
     setTranslation(value);
     setDefaultTranslation(value);
   };
+
+  // Parse typed query: the book name part (before any digits)
+  function getBookQueryPart(val: string): string {
+    // Everything before the first digit (and strip trailing space)
+    const m = val.match(/^([^\d]+)/);
+    return m ? m[1].trimEnd() : val;
+  }
+
+  const fetchVerseText = useCallback(
+    async (ref: string) => {
+      if (ref === lastFetchedRef.current) return;
+      lastFetchedRef.current = ref;
+
+      const translationObj = TRANSLATIONS.find((t) => t.value === translation);
+      const bgVersion = translationObj?.bgVersion ?? 'NGU-DE';
+
+      if (!bgVersion) return; // "Eigene" — skip fetch
+
+      setFetchingVerse(true);
+      setVerseFetched(false);
+
+      try {
+        const res = await fetch(
+          `/api/verse?ref=${encodeURIComponent(ref)}&version=${encodeURIComponent(bgVersion)}`
+        );
+        const data = await res.json();
+        if (data.text) {
+          setText(data.text);
+          setVerseFetched(true);
+        }
+      } catch {
+        // silently fail — user can type manually
+      } finally {
+        setFetchingVerse(false);
+      }
+    },
+    [translation]
+  );
+
+  const handleReferenceChange = (val: string) => {
+    setReference(val);
+    setVerseFetched(false);
+    setActiveSuggestion(-1);
+
+    // Determine book query (before digits)
+    const bookQuery = getBookQueryPart(val);
+
+    if (bookQuery.length >= 1) {
+      const results = searchBooks(bookQuery);
+      // Only show suggestions if user hasn't finished typing chapter:verse yet
+      const hasChapterVerse = /\d+[,:.]\d+/.test(val);
+      if (!hasChapterVerse) {
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+
+    // Check if reference looks complete → schedule fetch
+    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+    const parsed = parseReference(val);
+    if (parsed) {
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchVerseText(parsed.bgRef);
+      }, 600);
+    }
+  };
+
+  const selectBook = (book: BibleBook) => {
+    setReference(book.name + ' ');
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setActiveSuggestion(-1);
+    // Focus input and place cursor at end
+    setTimeout(() => {
+      if (refInputRef.current) {
+        refInputRef.current.focus();
+        const len = refInputRef.current.value.length;
+        refInputRef.current.setSelectionRange(len, len);
+      }
+    }, 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveSuggestion((prev) => Math.min(prev + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveSuggestion((prev) => Math.max(prev - 1, -1));
+    } else if (e.key === 'Enter' && activeSuggestion >= 0) {
+      e.preventDefault();
+      selectBook(suggestions[activeSuggestion]);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        refInputRef.current &&
+        !refInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,20 +234,63 @@ export default function AddVersePage() {
           <label className="text-base font-semibold text-blue-800">
             Bibelstelle <span className="text-red-400">*</span>
           </label>
-          <p className="text-xs text-blue-400">z. B. Johannes 3:16</p>
-          <input
-            type="text"
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-            placeholder="Johannes 3:16"
-            className={inputClass}
-          />
+          <p className="text-xs text-blue-400">z. B. Johannes 3,16 oder Phil 4,13</p>
+          <div className="relative">
+            <input
+              ref={refInputRef}
+              type="text"
+              value={reference}
+              onChange={(e) => handleReferenceChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (suggestions.length > 0) setShowSuggestions(true);
+              }}
+              placeholder="Johannes 3,16"
+              className={inputClass}
+              autoComplete="off"
+            />
+
+            {/* Dropdown suggestions */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div
+                ref={suggestionsRef}
+                className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-blue-200 rounded-xl shadow-lg overflow-hidden"
+              >
+                {suggestions.map((book, idx) => (
+                  <button
+                    key={book.name}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectBook(book);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+                      idx === activeSuggestion
+                        ? 'bg-blue-100 text-blue-900'
+                        : 'hover:bg-blue-50 text-blue-800'
+                    }`}
+                  >
+                    <span className="font-medium">{book.name}</span>
+                    <span className="text-xs text-blue-400 ml-2">{book.testament}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-base font-semibold text-blue-800">
-            Verstext <span className="text-red-400">*</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-base font-semibold text-blue-800">
+              Verstext <span className="text-red-400">*</span>
+            </label>
+            {fetchingVerse && (
+              <span className="text-xs text-blue-400 animate-pulse">Vers wird geladen…</span>
+            )}
+            {verseFetched && !fetchingVerse && (
+              <span className="text-xs text-green-500">Vers automatisch geladen</span>
+            )}
+          </div>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
