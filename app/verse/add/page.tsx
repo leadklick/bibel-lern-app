@@ -45,6 +45,7 @@ export default function AddVersePage() {
 
   const [fetchingVerse, setFetchingVerse] = useState(false);
   const [verseFetched, setVerseFetched] = useState(false);
+  const [fetchFailed, setFetchFailed] = useState(false);
 
   const bookInputRef = useRef<HTMLInputElement>(null);
   const chapterInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +86,7 @@ export default function AddVersePage() {
 
       setFetchingVerse(true);
       setVerseFetched(false);
+      setFetchFailed(false);
 
       try {
         const res = await fetch(
@@ -94,17 +96,21 @@ export default function AddVersePage() {
         if (data.text) {
           setText(data.text);
           setVerseFetched(true);
+          setFetchFailed(false);
           if (selectedBook) {
             const suggested = autoTags(selectedBook.name, data.text);
             setTags(suggested);
           }
-          // Auto-scroll to save button
           setTimeout(() => {
             saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }, 150);
+        } else {
+          setFetchFailed(true);
+          lastFetchedRef.current = '';
         }
       } catch {
-        // silently fail — user can type manually
+        setFetchFailed(true);
+        lastFetchedRef.current = '';
       } finally {
         setFetchingVerse(false);
       }
@@ -127,6 +133,7 @@ export default function AddVersePage() {
     setBookInput(val);
     setSelectedBook(null);
     setVerseFetched(false);
+    setFetchFailed(false);
     setActiveSuggestion(-1);
     lastFetchedRef.current = '';
 
@@ -171,6 +178,7 @@ export default function AddVersePage() {
   const handleChapterChange = (val: string) => {
     setChapter(val);
     setVerseFetched(false);
+    setFetchFailed(false);
     lastFetchedRef.current = '';
   };
 
@@ -181,6 +189,7 @@ export default function AddVersePage() {
   const handleVerseChange = (val: string) => {
     setVerse(val);
     setVerseFetched(false);
+    setFetchFailed(false);
     lastFetchedRef.current = '';
   };
 
@@ -415,11 +424,27 @@ export default function AddVersePage() {
           </div>
         )}
 
-        {/* Manual text fallback */}
-        {!fetchingVerse && !verseFetched && translation === 'Eigene' && (
+        {/* Manual text fallback — shown for 'Eigene' or when fetch failed */}
+        {!fetchingVerse && (translation === 'Eigene' || fetchFailed) && !verseFetched && (
           <div className="flex flex-col gap-1.5">
+            {fetchFailed && (
+              <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                <p className="text-sm text-orange-700">Vers konnte nicht automatisch geladen werden.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    lastFetchedRef.current = '';
+                    setFetchFailed(false);
+                    tryAutoFetch(selectedBook, chapter, verse);
+                  }}
+                  className="text-sm text-blue-600 font-medium ml-3 whitespace-nowrap"
+                >
+                  Nochmal ↺
+                </button>
+              </div>
+            )}
             <label className="text-base font-semibold text-blue-800">
-              Verstext <span className="text-red-400">*</span>
+              Verstext manuell eingeben <span className="text-red-400">*</span>
             </label>
             <textarea
               value={text}
