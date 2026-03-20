@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { addVerse, getDefaultTranslation, setDefaultTranslation } from '@/lib/storage';
 import { Verse } from '@/lib/types';
 import { searchBooks, BIBLE_BOOKS, BibleBook } from '@/lib/bible-books';
+import { autoTags } from '@/lib/auto-tags';
 
 function generateId() {
   return `verse-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -31,7 +32,8 @@ export default function AddVersePage() {
   const [verse, setVerse] = useState('');
 
   const [text, setText] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInputValue, setTagInputValue] = useState('');
   const [translation, setTranslation] = useState('NGU');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -50,6 +52,7 @@ export default function AddVersePage() {
   const verseInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const lastFetchedRef = useRef<string>('');
+  const tagInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTranslation(getDefaultTranslation());
@@ -93,6 +96,11 @@ export default function AddVersePage() {
         if (data.text) {
           setText(data.text);
           setVerseFetched(true);
+          // Auto-suggest tags based on book and fetched verse text
+          if (selectedBook) {
+            const suggested = autoTags(selectedBook.name, data.text);
+            setTags(suggested);
+          }
         }
       } catch {
         // silently fail — user can type manually
@@ -100,7 +108,8 @@ export default function AddVersePage() {
         setFetchingVerse(false);
       }
     },
-    [translation]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [translation, selectedBook]
   );
 
   // Attempt auto-fetch when all three fields are set
@@ -207,9 +216,48 @@ export default function AddVersePage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Tag pill helpers
+  const removeTag = (tagToRemove: string) => {
+    setTags((prev) => prev.filter((t) => t !== tagToRemove));
+  };
+
+  const addTag = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    // Support comma-separated input
+    const parts = trimmed.split(',').map((p) => p.trim()).filter(Boolean);
+    setTags((prev) => {
+      const combined = [...prev];
+      for (const part of parts) {
+        if (!combined.includes(part)) {
+          combined.push(part);
+        }
+      }
+      return combined;
+    });
+    setTagInputValue('');
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInputValue);
+    } else if (e.key === 'Backspace' && tagInputValue === '' && tags.length > 0) {
+      setTags((prev) => prev.slice(0, -1));
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Flush any pending tag input
+    const pendingTag = tagInputValue.trim();
+    const finalTags = pendingTag
+      ? [...tags, ...pendingTag.split(',').map((t) => t.trim()).filter(Boolean)].filter(
+          (t, i, arr) => arr.indexOf(t) === i
+        )
+      : tags;
 
     const reference = buildReference(selectedBook, chapter, verse);
 
@@ -224,17 +272,12 @@ export default function AddVersePage() {
 
     setSaving(true);
 
-    const tags = tagsInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-
     const now = Date.now();
     const verseObj: Verse = {
       id: generateId(),
       reference: reference.trim(),
       text: text.trim(),
-      tags,
+      tags: finalTags,
       translation,
       createdAt: now,
       interval: 1,
@@ -381,18 +424,51 @@ export default function AddVersePage() {
           </select>
         </div>
 
+        {/* Tags / Kategorien — pill UI */}
         <div className="flex flex-col gap-1.5">
           <label className="text-base font-semibold text-blue-800">
             Tags / Kategorien
           </label>
-          <p className="text-xs text-blue-400">Kommagetrennt, z. B. Glaube, Liebe</p>
-          <input
-            type="text"
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            placeholder="Glaube, Liebe"
-            className={inputClass}
-          />
+          <p className="text-xs text-blue-400">
+            Werden automatisch vorgeschlagen. Tippe zum Hinzufügen, Enter oder Komma zum Bestätigen.
+          </p>
+
+          <div
+            className="flex flex-wrap gap-2 items-center border border-blue-200 rounded-xl px-3 py-2 bg-white focus-within:ring-2 focus-within:ring-blue-300 min-h-[48px] cursor-text"
+            onClick={() => tagInputRef.current?.focus()}
+          >
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-1 rounded-full"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeTag(tag);
+                  }}
+                  className="text-blue-500 hover:text-blue-800 transition-colors leading-none ml-0.5"
+                  aria-label={`${tag} entfernen`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            <input
+              ref={tagInputRef}
+              type="text"
+              value={tagInputValue}
+              onChange={(e) => setTagInputValue(e.target.value)}
+              onKeyDown={handleTagInputKeyDown}
+              onBlur={() => {
+                if (tagInputValue.trim()) addTag(tagInputValue);
+              }}
+              placeholder={tags.length === 0 ? 'Glaube, Liebe …' : ''}
+              className="flex-1 min-w-[120px] outline-none text-base bg-transparent placeholder-blue-300 py-1"
+            />
+          </div>
         </div>
 
         {error && (
