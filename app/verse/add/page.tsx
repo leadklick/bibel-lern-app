@@ -62,7 +62,22 @@ export default function AddVersePage() {
   const handleTranslationChange = (value: string) => {
     setTranslation(value);
     setDefaultTranslation(value);
+    // Re-fetch verse in new translation if one is already loaded
+    if (selectedBook && chapter && verse) {
+      lastFetchedRef.current = '';
+      setVerseFetched(false);
+      setFetchFailed(false);
+      setText('');
+    }
   };
+
+  // Re-fetch when translation changes and a verse is already selected
+  useEffect(() => {
+    if (selectedBook && chapter && verse && !fetchingVerse) {
+      tryAutoFetch(selectedBook, chapter, verse);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translation]);
 
   function buildReference(book: BibleBook | null, chap: string, ver: string): string {
     if (!book || !chap || !ver) return '';
