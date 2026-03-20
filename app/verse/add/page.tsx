@@ -51,33 +51,17 @@ export default function AddVersePage() {
   const chapterInputRef = useRef<HTMLInputElement>(null);
   const verseInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const lastFetchedRef = useRef<string>('');
   const tagInputRef = useRef<HTMLInputElement>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
+  // Always-current refs — no stale closure issues
+  const translationRef = useRef(translation);
+  const selectedBookRef = useRef(selectedBook);
+  useEffect(() => { translationRef.current = translation; }, [translation]);
+  useEffect(() => { selectedBookRef.current = selectedBook; }, [selectedBook]);
 
   useEffect(() => {
     setTranslation(getDefaultTranslation());
   }, []);
-
-  const handleTranslationChange = (value: string) => {
-    setTranslation(value);
-    setDefaultTranslation(value);
-    // Re-fetch verse in new translation if one is already loaded
-    if (selectedBook && chapter && verse) {
-      lastFetchedRef.current = ''; // clear cache so new translation is fetched
-      setVerseFetched(false);
-      setFetchFailed(false);
-      setText('');
-    }
-  };
-
-  // Re-fetch when translation changes and a verse is already selected
-  useEffect(() => {
-    if (selectedBook && chapter && verse && !fetchingVerse) {
-      tryAutoFetch(selectedBook, chapter, verse);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [translation]);
 
   function buildReference(book: BibleBook | null, chap: string, ver: string): string {
     if (!book || !chap || !ver) return '';
@@ -89,62 +73,53 @@ export default function AddVersePage() {
     return `${book.bgName}+${chap}:${ver}`;
   }
 
-  const fetchVerseText = useCallback(
-    async (bgRef: string) => {
-      const translationObj = TRANSLATIONS.find((t) => t.value === translation);
-      const bgVersion = translationObj?.bgVersion ?? 'NGU-DE';
+  const doFetch = useCallback(async (bgRef: string, bgVersion: string) => {
+    setFetchingVerse(true);
+    setVerseFetched(false);
+    setFetchFailed(false);
+    setText('');
 
-      if (!bgVersion) return;
-
-      // Include translation in cache key so switching translations always re-fetches
-      const cacheKey = `${bgRef}__${bgVersion}`;
-      if (cacheKey === lastFetchedRef.current) return;
-      lastFetchedRef.current = cacheKey;
-
-      setFetchingVerse(true);
-      setVerseFetched(false);
-      setFetchFailed(false);
-
-      try {
-        const res = await fetch(
-          `/api/verse?ref=${encodeURIComponent(bgRef)}&version=${encodeURIComponent(bgVersion)}`
-        );
-        const data = await res.json();
-        if (data.text) {
-          setText(data.text);
-          setVerseFetched(true);
-          setFetchFailed(false);
-          if (selectedBook) {
-            const suggested = autoTags(selectedBook.name, data.text);
-            setTags(suggested);
-          }
-          setTimeout(() => {
-            saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 150);
-        } else {
-          setFetchFailed(true);
-          lastFetchedRef.current = '';
-        }
-      } catch {
+    try {
+      const res = await fetch(
+        `/api/verse?ref=${encodeURIComponent(bgRef)}&version=${encodeURIComponent(bgVersion)}`
+      );
+      const data = await res.json();
+      if (data.text) {
+        setText(data.text);
+        setVerseFetched(true);
+        const book = selectedBookRef.current;
+        if (book) setTags(autoTags(book.name, data.text));
+        setTimeout(() => {
+          saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+      } else {
         setFetchFailed(true);
-        lastFetchedRef.current = '';
-      } finally {
-        setFetchingVerse(false);
       }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [translation, selectedBook]
-  );
+    } catch {
+      setFetchFailed(true);
+    } finally {
+      setFetchingVerse(false);
+    }
+  }, []);
 
-  const tryAutoFetch = useCallback(
-    (book: BibleBook | null, chap: string, ver: string) => {
-      const bgRef = buildBgRef(book, chap, ver);
-      if (bgRef) {
-        fetchVerseText(bgRef);
-      }
-    },
-    [fetchVerseText]
-  );
+  const tryAutoFetch = useCallback((book: BibleBook | null, chap: string, ver: string, overrideTranslation?: string) => {
+    const bgRef = buildBgRef(book, chap, ver);
+    if (!bgRef) return;
+    const t = overrideTranslation ?? translationRef.current;
+    const translationObj = TRANSLATIONS.find((x) => x.value === t);
+    const bgVersion = translationObj?.bgVersion ?? 'NGU-DE';
+    if (!bgVersion) return;
+    doFetch(bgRef, bgVersion);
+  }, [doFetch]);
+
+  const handleTranslationChange = (value: string) => {
+    setTranslation(value);
+    translationRef.current = value;
+    setDefaultTranslation(value);
+    if (selectedBook && chapter && verse) {
+      tryAutoFetch(selectedBook, chapter, verse, value);
+    }
+  };
 
   const handleBookInputChange = (val: string) => {
     setBookInput(val);
@@ -152,7 +127,6 @@ export default function AddVersePage() {
     setVerseFetched(false);
     setFetchFailed(false);
     setActiveSuggestion(-1);
-    lastFetchedRef.current = '';
 
     if (val.trim().length >= 1) {
       const results = searchBooks(val.trim());
@@ -196,7 +170,6 @@ export default function AddVersePage() {
     setChapter(val);
     setVerseFetched(false);
     setFetchFailed(false);
-    lastFetchedRef.current = '';
   };
 
   const handleChapterBlur = () => {
@@ -207,7 +180,6 @@ export default function AddVersePage() {
     setVerse(val);
     setVerseFetched(false);
     setFetchFailed(false);
-    lastFetchedRef.current = '';
   };
 
   const handleVerseBlur = () => {
@@ -450,8 +422,7 @@ export default function AddVersePage() {
                 <button
                   type="button"
                   onClick={() => {
-                    lastFetchedRef.current = '';
-                    setFetchFailed(false);
+                                    setFetchFailed(false);
                     tryAutoFetch(selectedBook, chapter, verse);
                   }}
                   className="text-sm text-blue-600 font-medium ml-3 whitespace-nowrap"
