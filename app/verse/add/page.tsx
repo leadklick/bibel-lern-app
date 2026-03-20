@@ -64,7 +64,7 @@ export default function AddVersePage() {
     setDefaultTranslation(value);
     // Re-fetch verse in new translation if one is already loaded
     if (selectedBook && chapter && verse) {
-      lastFetchedRef.current = '';
+      lastFetchedRef.current = ''; // clear cache so new translation is fetched
       setVerseFetched(false);
       setFetchFailed(false);
       setText('');
@@ -91,13 +91,15 @@ export default function AddVersePage() {
 
   const fetchVerseText = useCallback(
     async (bgRef: string) => {
-      if (bgRef === lastFetchedRef.current) return;
-      lastFetchedRef.current = bgRef;
-
       const translationObj = TRANSLATIONS.find((t) => t.value === translation);
       const bgVersion = translationObj?.bgVersion ?? 'NGU-DE';
 
       if (!bgVersion) return;
+
+      // Include translation in cache key so switching translations always re-fetches
+      const cacheKey = `${bgRef}__${bgVersion}`;
+      if (cacheKey === lastFetchedRef.current) return;
+      lastFetchedRef.current = cacheKey;
 
       setFetchingVerse(true);
       setVerseFetched(false);
