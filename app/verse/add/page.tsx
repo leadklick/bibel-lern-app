@@ -218,7 +218,7 @@ export default function AddVersePage() {
       return;
     }
     if (!text.trim()) {
-      setError('Bitte gib den Verstext ein.');
+      setError('Verstext konnte nicht geladen werden. Bitte prüfe die Bibelstelle.');
       return;
     }
 
@@ -347,26 +347,22 @@ export default function AddVersePage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <label className="text-base font-semibold text-blue-800">
-              Verstext <span className="text-red-400">*</span>
-            </label>
+        {/* Verse preview */}
+        {(fetchingVerse || text) && (
+          <div className="flex flex-col gap-1.5">
             {fetchingVerse && (
-              <span className="text-xs text-blue-400 animate-pulse">Vers wird geladen…</span>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-400 text-sm animate-pulse">
+                Vers wird geladen…
+              </div>
             )}
-            {verseFetched && !fetchingVerse && (
-              <span className="text-xs text-green-500">Vers automatisch geladen</span>
+            {text && !fetchingVerse && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                <p className="text-xs text-green-500 font-medium mb-1">Vers geladen</p>
+                <p className="text-gray-700 text-base leading-relaxed">{text}</p>
+              </div>
             )}
           </div>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Denn also hat Gott die Welt geliebt…"
-            rows={5}
-            className={`${inputClass} resize-none h-auto`}
-          />
-        </div>
+        )}
 
         <div className="flex flex-col gap-1.5">
           <label className="text-base font-semibold text-blue-800">
