@@ -164,18 +164,17 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'Missing ref parameter' }, { status: 400 });
   }
 
-  // PRIMARY: look up in locally embedded Schlachter Bible (instant, 100% reliable)
-  const localText = lookupLocalVerse(ref);
-  if (localText) {
-    return Response.json({ text: localText });
-  }
-
-  // FALLBACK: Try BibleGateway
+  // PRIMARY: Try BibleGateway with the requested translation
   let text = await fetchFromBibleGateway(ref, version);
 
-  // Fallback: try LUT on BibleGateway if NGU failed (NGU doesn't cover full OT)
+  // If NGU failed (NGU doesn't cover full OT), try LUT
   if (!text && version === 'NGU-DE') {
     text = await fetchFromBibleGateway(ref, 'LUT');
+  }
+
+  // FALLBACK: local embedded Schlachter Bible (always works, used when BibleGateway is unavailable)
+  if (!text) {
+    text = lookupLocalVerse(ref);
   }
 
   // Final fallback: getbible.net
