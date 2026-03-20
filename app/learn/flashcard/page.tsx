@@ -130,23 +130,21 @@ export default function FlashcardPage() {
 
 function RatingButtons({ onRate }: { onRate: (r: number) => void }) {
   const options = [
-    { value: 1, label: 'Gar nicht', color: 'bg-red-100 text-red-700 hover:bg-red-200' },
-    { value: 2, label: 'Kaum', color: 'bg-orange-100 text-orange-700 hover:bg-orange-200' },
-    { value: 3, label: 'Mit Mühe', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
-    { value: 4, label: 'Gut', color: 'bg-lime-100 text-lime-700 hover:bg-lime-200' },
-    { value: 5, label: 'Perfekt', color: 'bg-green-100 text-green-700 hover:bg-green-200' },
+    { value: 1, emoji: '❌', label: 'Nicht gewusst', color: 'bg-red-100 text-red-700 hover:bg-red-200 active:bg-red-300' },
+    { value: 3, emoji: '😐', label: 'Fast', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 active:bg-yellow-300' },
+    { value: 5, emoji: '✅', label: 'Gewusst', color: 'bg-green-100 text-green-700 hover:bg-green-200 active:bg-green-300' },
   ];
 
   return (
-    <div className="grid grid-cols-5 gap-2">
-      {options.map(({ value, label, color }) => (
+    <div className="grid grid-cols-3 gap-3">
+      {options.map(({ value, emoji, label, color }) => (
         <button
           key={value}
           onClick={() => onRate(value)}
-          className={`${color} rounded-xl py-3 md:py-4 text-xs font-semibold transition-colors flex flex-col items-center gap-1 min-h-[64px]`}
+          className={`${color} rounded-xl py-4 font-semibold transition-colors flex flex-col items-center gap-2 min-h-[80px]`}
         >
-          <span className="text-lg md:text-xl font-bold">{value}</span>
-          <span className="leading-tight text-center">{label}</span>
+          <span className="text-3xl">{emoji}</span>
+          <span className="text-sm leading-tight text-center">{label}</span>
         </button>
       ))}
     </div>
