@@ -26,8 +26,8 @@ export default function Navigation() {
   return (
     <>
       {/* Desktop top nav */}
-      <nav className="hidden md:block bg-white border-b border-blue-100 shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <nav className="hidden md:flex bg-white border-b border-blue-100 shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between w-full">
           <Link href="/" className="flex items-center gap-2">
             <BibelMeisterLogo size={32} />
             <span className="font-semibold text-slate-900 text-lg tracking-tight">
@@ -61,6 +61,27 @@ export default function Navigation() {
           </div>
         </div>
       </nav>
+
+      {/* Mobile top header */}
+      <header className="md:hidden sticky top-0 z-40 bg-white border-b border-blue-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <Link href="/" className="flex items-center gap-2">
+            <BibelMeisterLogo size={28} />
+            <span className="font-semibold text-slate-900 text-base tracking-tight">
+              BibelMeister
+            </span>
+          </Link>
+          {dueCount > 0 && (
+            <Link
+              href="/learn"
+              className="flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full"
+            >
+              <span>🎯</span>
+              <span>{dueCount} fällig</span>
+            </Link>
+          )}
+        </div>
+      </header>
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-blue-100 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]">
