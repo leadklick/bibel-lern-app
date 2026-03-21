@@ -47,7 +47,7 @@ export default function Navigation() {
                 >
                   {label}
                   {showBadge && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                       {dueCount > 99 ? '99+' : dueCount}
                     </span>
                   )}
@@ -86,7 +86,7 @@ export default function Navigation() {
                 <span className="text-xl leading-none relative">
                   {icon}
                   {showBadge && (
-                    <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                    <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] bg-green-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
                       {dueCount > 9 ? '9+' : dueCount}
                     </span>
                   )}

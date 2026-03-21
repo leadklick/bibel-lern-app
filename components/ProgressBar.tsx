@@ -16,9 +16,17 @@ export default function ProgressBar({
     <div className={`flex items-center gap-3 ${className}`}>
       <div className="flex-1 bg-blue-100 rounded-full h-2.5">
         <div
-          className={`${color} h-2.5 rounded-full transition-all duration-500`}
+          className={`${color} h-2.5 rounded-full transition-all duration-700 ease-out relative overflow-hidden`}
           style={{ width: `${pct}%` }}
-        />
+        >
+          {pct > 5 && (
+            <span className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" style={{
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 2s infinite',
+            }} />
+          )}
+        </div>
       </div>
       {showPercent && (
         <span className="text-xs font-semibold text-blue-600 w-10 text-right shrink-0">

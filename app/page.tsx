@@ -82,14 +82,31 @@ export default function Dashboard() {
       </div>
 
       {/* Daily motivational quote */}
-      <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 flex flex-col gap-1 text-center">
-        <p className="text-xs text-blue-400 uppercase tracking-widest font-medium mb-1">
-          Tagesvers
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-sm p-5 flex flex-col gap-1 text-center">
+        <p className="text-xs text-blue-400 uppercase tracking-widest font-medium mb-2">
+          ✦ Tagesvers ✦
         </p>
-        <p className="text-blue-800 font-medium text-base md:text-lg leading-relaxed italic">
+        <p className="text-blue-900 font-serif text-lg md:text-xl leading-relaxed italic font-medium">
           &ldquo;{quote.text}&rdquo;
         </p>
-        <p className="text-blue-400 text-sm mt-1">{quote.ref}</p>
+        <p className="text-blue-400 text-sm mt-2">{quote.ref}</p>
+        <div className="flex items-center justify-center gap-4 mt-3">
+          <button className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-red-400 transition-colors active:scale-110">
+            <span className="text-base">🤍</span> Favorit
+          </button>
+          <button
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ text: `"${quote.text}" – ${quote.ref}` });
+              } else {
+                navigator.clipboard.writeText(`"${quote.text}" – ${quote.ref}`);
+              }
+            }}
+            className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-600 transition-colors active:scale-110"
+          >
+            <span className="text-base">↗️</span> Teilen
+          </button>
+        </div>
       </div>
 
       {/* First-time welcome */}
@@ -126,6 +143,7 @@ export default function Dashboard() {
           value={stats.streak}
           icon="🔥"
           flameIcon
+          streak={stats.streak > 0}
         />
       </div>
 
@@ -143,18 +161,19 @@ export default function Dashboard() {
       {/* CTA: Due Today */}
       {!isFirstTimeUser && (
         dueCount > 0 ? (
-          <div className="bg-blue-600 rounded-2xl p-6 text-white text-center shadow-md">
-            <p className="text-xl font-semibold mb-1">
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white text-center shadow-lg">
+            <p className="text-2xl mb-1">🎯</p>
+            <p className="text-xl font-bold mb-1">
               {dueCount} Vers{dueCount !== 1 ? 'e' : ''} warten auf dich!
             </p>
-            <p className="text-blue-200 text-sm mb-5">
-              Halte deinen Streak aufrecht und lerne jetzt.
+            <p className="text-blue-100 text-sm mb-5">
+              Du schaffst das — jede Wiederholung bringt dich weiter.
             </p>
             <Link
               href="/learn"
-              className="block bg-white text-blue-700 font-semibold px-6 py-3.5 rounded-xl hover:bg-blue-50 transition-colors text-base w-full text-center md:inline-block md:w-auto"
+              className="block bg-white text-blue-700 font-bold px-6 py-3.5 rounded-xl hover:bg-blue-50 active:scale-95 transition-all text-base w-full text-center md:inline-block md:w-auto shadow-sm"
             >
-              Jetzt lernen →
+              Jetzt lernen ✨
             </Link>
           </div>
         ) : (
@@ -188,6 +207,7 @@ function StatCard({
   subtext,
   flameIcon = false,
   pulse = false,
+  streak = false,
 }: {
   label: string;
   value: number | string;
@@ -196,23 +216,26 @@ function StatCard({
   subtext?: string;
   flameIcon?: boolean;
   pulse?: boolean;
+  streak?: boolean;
 }) {
   return (
     <div
-      className={`rounded-2xl p-4 md:p-5 text-center border shadow-sm flex flex-col items-center gap-1 ${
+      className={`rounded-2xl p-4 md:p-5 text-center border shadow-sm flex flex-col items-center gap-1 transition-all ${
         highlight
           ? 'bg-blue-600 border-blue-600 text-white'
+          : streak
+          ? 'bg-gradient-to-b from-orange-50 to-amber-50 border-orange-200 text-orange-900'
           : 'bg-white border-blue-100 text-blue-900'
       }`}
     >
-      <span className={flameIcon ? 'flame-icon text-2xl' : 'text-2xl'}>{icon}</span>
-      <div className={`text-2xl md:text-3xl font-bold leading-tight ${pulse ? 'animate-pulse' : ''}`}>{value}</div>
+      <span className="text-2xl">{icon}</span>
+      <div className={`text-2xl md:text-3xl font-bold leading-tight ${pulse ? 'animate-pulse' : ''} ${streak ? 'text-orange-500' : ''}`}>{value}</div>
       {subtext ? (
         <div className={`text-xs font-semibold ${highlight ? 'text-blue-100' : 'text-green-600'}`}>
           {subtext}
         </div>
       ) : (
-        <div className={`text-xs md:text-sm ${highlight ? 'text-blue-200' : 'text-blue-500'}`}>
+        <div className={`text-xs md:text-sm ${highlight ? 'text-blue-200' : streak ? 'text-orange-400' : 'text-blue-500'}`}>
           {label}
         </div>
       )}
