@@ -107,3 +107,37 @@ body {
   display: inline-block;
   animation: flame-pulse 2s ease-in-out infinite;
 }
+
+/* ── Duel animations ─────────────────────────────────────────────────────── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.shake { animation: shake 0.3s ease; }
+
+@keyframes countdown-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.countdown-pop {
+  animation: countdown-pop 0.4s ease-out both;
+}
+
+@keyframes green-flash {
+  0% { background-color: rgb(187 247 208); }
+  100% { background-color: transparent; }
+}
+.correct-flash {
+  animation: green-flash 0.6s ease-out both;
+}
+
+@keyframes timer-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+.timer-urgent {
+  animation: timer-pulse 0.8s ease-in-out infinite;
+  color: rgb(220 38 38);
+}

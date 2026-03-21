@@ -48,6 +48,14 @@ export default function LearnPage() {
         'Den gesamten Vers aus dem Gedächtnis tippen. Maximale Herausforderung.',
       color: 'from-violet-500 to-violet-600',
     },
+    {
+      href: '/learn/duel',
+      icon: '⚔️',
+      title: 'Lern-Duell',
+      description:
+        '60 Sekunden Quiz – schlage deinen eigenen Rekord mit dem Ghost-Runner.',
+      color: 'from-rose-500 to-rose-600',
+    },
   ];
 
   return (

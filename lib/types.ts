@@ -29,3 +29,12 @@ export interface AppStats {
 }
 
 export type LearnMode = 'flashcard' | 'lueckentext' | 'tippen';
+
+export interface DuelResult {
+  id: string;
+  verseId: string;
+  score: number;
+  timeUsed: number; // seconds
+  errors: number;
+  date: number;
+}

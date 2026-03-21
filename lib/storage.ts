@@ -1,4 +1,4 @@
-import { Verse, AppStats } from './types';
+import { Verse, AppStats, DuelResult } from './types';
 import { PRELOADED_VERSES } from './verses-data';
 
 const VERSES_KEY = 'bibel_verses';
@@ -79,6 +79,33 @@ export function getStats(): AppStats {
   } catch {
     return { streak: 0, lastStudyDate: null, totalReviews: 0 };
   }
+}
+
+// ── Duel Results ──────────────────────────────────────────────────────────────
+
+const DUEL_RESULTS_KEY = 'bibel_duel_results';
+
+export function getDuelResults(): DuelResult[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(DUEL_RESULTS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as DuelResult[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveDuelResult(result: DuelResult): void {
+  if (typeof window === 'undefined') return;
+  const results = getDuelResults();
+  localStorage.setItem(DUEL_RESULTS_KEY, JSON.stringify([...results, result]));
+}
+
+export function getBestScore(verseId: string): DuelResult | null {
+  const results = getDuelResults().filter((r) => r.verseId === verseId);
+  if (results.length === 0) return null;
+  return results.reduce((best, r) => (r.score > best.score ? r : best), results[0]);
 }
 
 export function recordStudySession(): void {
