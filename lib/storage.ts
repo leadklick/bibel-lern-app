@@ -48,6 +48,65 @@ export function getDueVerses(): Verse[] {
   return verses.filter((v) => v.nextReview <= endOfToday.getTime());
 }
 
+// Fisher-Yates shuffle
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export function getShuffledDueVerses(): Verse[] {
+  return shuffle(getDueVerses());
+}
+
+// ── Session Tracking ──────────────────────────────────────────────────────────
+const SESSION_KEY = 'bibel_session';
+const SESSION_TTL = 10 * 60 * 1000; // 10 minutes
+
+interface SessionData {
+  seenIds: string[];
+  startTime: number;
+}
+
+export function getSessionSeen(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return [];
+    const data: SessionData = JSON.parse(raw);
+    if (Date.now() - data.startTime > SESSION_TTL) {
+      localStorage.removeItem(SESSION_KEY);
+      return [];
+    }
+    return data.seenIds;
+  } catch {
+    return [];
+  }
+}
+
+export function markSessionSeen(verseId: string): void {
+  if (typeof window === 'undefined') return;
+  const seen = getSessionSeen();
+  if (seen.includes(verseId)) return;
+  const data: SessionData = {
+    seenIds: [...seen, verseId],
+    startTime: Date.now(),
+  };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+}
+
+export function getNextVerses(): Verse[] {
+  const due = getDueVerses();
+  const seen = getSessionSeen();
+  // Unseen verses first (shuffled), then seen ones (shuffled) as fallback
+  const unseen = shuffle(due.filter((v) => !seen.includes(v.id)));
+  const seenVerses = shuffle(due.filter((v) => seen.includes(v.id)));
+  return [...unseen, ...seenVerses];
+}
+
 // ── Default Translation ───────────────────────────────────────────────────────
 
 const DEFAULT_TRANSLATION_KEY = 'bibel_default_translation';

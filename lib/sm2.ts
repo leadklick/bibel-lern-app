@@ -10,7 +10,6 @@ export function applyReview(verse: Verse, rating: number): Verse {
 
   let { interval, repetitions, easeFactor } = verse;
 
-  // Update ease factor (min 1.3)
   const newEaseFactor = Math.max(
     1.3,
     easeFactor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02))
@@ -18,24 +17,31 @@ export function applyReview(verse: Verse, rating: number): Verse {
 
   let newInterval: number;
   let newRepetitions: number;
+  let nextReview: number;
 
   if (rating < 3) {
-    // Failed review — reset
-    newInterval = 1;
+    // "Nicht gewusst" — stays due today (review again in this session)
+    newInterval = 0;
     newRepetitions = 0;
+    nextReview = now; // immediately due again
+  } else if (rating === 3) {
+    // "Fast" — review tomorrow
+    newInterval = 1;
+    newRepetitions = Math.max(1, repetitions);
+    nextReview = now + 1 * dayMs;
   } else {
-    // Successful review
+    // "Gewusst" — SM-2 with minimum 4 days
     if (repetitions === 0) {
-      newInterval = 1;
+      newInterval = 4;
     } else if (repetitions === 1) {
       newInterval = 6;
     } else {
       newInterval = Math.round(interval * newEaseFactor);
     }
+    newInterval = Math.max(4, newInterval);
     newRepetitions = repetitions + 1;
+    nextReview = now + newInterval * dayMs;
   }
-
-  const nextReview = now + newInterval * dayMs;
 
   return {
     ...verse,

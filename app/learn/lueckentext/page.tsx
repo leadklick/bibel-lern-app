@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getDueVerses, getVerses, updateVerse, recordStudySession } from '@/lib/storage';
+import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";;
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import { generateSmartGaps, isSynonym, Difficulty } from '@/lib/smart-gaps';
@@ -94,9 +94,9 @@ export default function LueckentextPage() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    const due = getDueVerses();
-    const all = getVerses();
-    const q = due.length > 0 ? due : all;
+    
+    
+    const next = getNextVerses(); const q = next.length > 0 ? next : getVerses();
     setQueue(q);
     if (q.length > 0) setBlanks(buildBlanksForVerse(q[0].text, 'normal'));
     setMounted(true);
@@ -185,9 +185,9 @@ export default function LueckentextPage() {
         <div className="flex flex-col gap-3">
           <button
             onClick={() => {
-              const due = getDueVerses();
-              const all = getVerses();
-              const q = due.length > 0 ? due : all;
+              
+              
+              const next = getNextVerses(); const q = next.length > 0 ? next : getVerses();
               setQueue(q);
               setIndex(0);
               if (q.length > 0) setBlanks(buildBlanksForVerse(q[0].text, difficulty));

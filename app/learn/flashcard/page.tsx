@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getDueVerses, getVerses, updateVerse, recordStudySession } from '@/lib/storage';
+import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";;
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import ProgressBar from '@/components/ProgressBar';
@@ -32,9 +32,9 @@ export default function FlashcardPage() {
   });
 
   useEffect(() => {
-    const due = getDueVerses();
-    const all = getVerses();
-    setQueue(due.length > 0 ? due : all);
+    
+    
+    setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
     setMounted(true);
   }, []);
 
@@ -59,9 +59,9 @@ export default function FlashcardPage() {
         result={sessionResult}
         onBack={() => router.push('/learn')}
         onAgain={() => {
-          const due = getDueVerses();
-          const all = getVerses();
-          setQueue(due.length > 0 ? due : all);
+          
+          
+          setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
           setIndex(0);
           setPhase('front');
           setFlipped(false);
@@ -83,6 +83,7 @@ export default function FlashcardPage() {
     const updated = applyReview(verse, rating);
     updateVerse(updated);
     recordStudySession();
+    markSessionSeen(verse.id);
 
     const ratingLabel = rating >= 5 ? 'known' : rating >= 3 ? 'almost' : 'unknown';
     setSessionResult((prev) => ({

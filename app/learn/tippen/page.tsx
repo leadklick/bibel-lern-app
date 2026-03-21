@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getDueVerses, getVerses, updateVerse, recordStudySession } from '@/lib/storage';
+import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";;
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import ProgressBar from '@/components/ProgressBar';
@@ -62,9 +62,9 @@ export default function TippenPage() {
   });
 
   useEffect(() => {
-    const due = getDueVerses();
-    const all = getVerses();
-    setQueue(due.length > 0 ? due : all);
+    
+    
+    setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
     setMounted(true);
   }, []);
 
@@ -97,9 +97,9 @@ export default function TippenPage() {
         result={sessionResult}
         onBack={() => router.push('/learn')}
         onAgain={() => {
-          const due = getDueVerses();
-          const all = getVerses();
-          setQueue(due.length > 0 ? due : all);
+          
+          
+          setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
           setIndex(0);
           setInput('');
           setWordResults([]);
