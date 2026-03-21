@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";;
+import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import { generateSmartGaps, isSynonym, Difficulty } from '@/lib/smart-gaps';
@@ -77,6 +77,9 @@ const DIFFICULTY_LABELS: { value: Difficulty; label: string }[] = [
   { value: 'meister', label: 'Meister' },
 ];
 
+// Maximum times a verse can be re-queued in one session
+const MAX_REQUEUE = 2;
+
 export default function LueckentextPage() {
   const router = useRouter();
   const [queue, setQueue] = useState<Verse[]>([]);
@@ -92,11 +95,11 @@ export default function LueckentextPage() {
     unknown: 0,
   });
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const requeueCount = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    
-    
-    const next = getNextVerses(); const q = next.length > 0 ? next : getVerses();
+    const next = getNextVerses();
+    const q = next.length > 0 ? next : getVerses();
     setQueue(q);
     if (q.length > 0) setBlanks(buildBlanksForVerse(q[0].text, 'normal'));
     setMounted(true);
@@ -185,14 +188,14 @@ export default function LueckentextPage() {
         <div className="flex flex-col gap-3">
           <button
             onClick={() => {
-              
-              
-              const next = getNextVerses(); const q = next.length > 0 ? next : getVerses();
+              const next = getNextVerses();
+              const q = next.length > 0 ? next : getVerses();
               setQueue(q);
               setIndex(0);
               if (q.length > 0) setBlanks(buildBlanksForVerse(q[0].text, difficulty));
               setPhase('exercise');
               setSessionResult({ total: 0, known: 0, almost: 0, unknown: 0 });
+              requeueCount.current = {};
             }}
             className="w-full bg-blue-600 text-white font-semibold py-4 rounded-xl hover:bg-blue-700 transition-colors text-base min-h-[52px] active:scale-[0.98]"
           >
@@ -237,6 +240,7 @@ export default function LueckentextPage() {
     const updated = applyReview(verse, rating);
     updateVerse(updated);
     recordStudySession();
+    markSessionSeen(verse.id);
 
     const ratingLabel = rating >= 5 ? 'known' : rating >= 3 ? 'almost' : 'unknown';
     setSessionResult((prev) => ({
@@ -246,13 +250,40 @@ export default function LueckentextPage() {
       unknown: prev.unknown + (ratingLabel === 'unknown' ? 1 : 0),
     }));
 
-    const nextIndex = index + 1;
-    if (nextIndex >= queue.length) {
-      setPhase('done');
+    if (rating < 3) {
+      // "Nicht gewusst" — move verse to the end of the queue so it reappears,
+      // but only up to MAX_REQUEUE times to prevent infinite looping.
+      const count = (requeueCount.current[verse.id] ?? 0) + 1;
+      requeueCount.current[verse.id] = count;
+
+      if (count <= MAX_REQUEUE) {
+        // Build the new queue: remove current, append to end
+        const newQueue = [...queue.filter((_, i) => i !== index), updated];
+        setQueue(newQueue);
+        // index stays the same — the next verse slides into the current slot
+        if (newQueue.length > index) {
+          setBlanks(buildBlanksForVerse(newQueue[index].text, difficulty));
+        }
+        setPhase('exercise');
+      } else {
+        const nextIndex = index + 1;
+        if (nextIndex >= queue.length) {
+          setPhase('done');
+        } else {
+          setIndex(nextIndex);
+          setBlanks(buildBlanksForVerse(queue[nextIndex].text, difficulty));
+          setPhase('exercise');
+        }
+      }
     } else {
-      setIndex(nextIndex);
-      setBlanks(buildBlanksForVerse(queue[nextIndex].text, difficulty));
-      setPhase('exercise');
+      const nextIndex = index + 1;
+      if (nextIndex >= queue.length) {
+        setPhase('done');
+      } else {
+        setIndex(nextIndex);
+        setBlanks(buildBlanksForVerse(queue[nextIndex].text, difficulty));
+        setPhase('exercise');
+      }
     }
   };
 

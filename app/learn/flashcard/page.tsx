@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";;
+import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import ProgressBar from '@/components/ProgressBar';
@@ -17,6 +17,9 @@ interface SessionResult {
   unknown: number;
 }
 
+// Maximum number of times a single verse can be re-queued in one session
+const MAX_REQUEUE = 2;
+
 export default function FlashcardPage() {
   const router = useRouter();
   const [queue, setQueue] = useState<Verse[]>([]);
@@ -30,11 +33,12 @@ export default function FlashcardPage() {
     almost: 0,
     unknown: 0,
   });
+  // Track how many times each verse has been re-queued to prevent infinite loops
+  const requeueCount = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    
-    
-    setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
+    const next = getNextVerses();
+    setQueue(next.length > 0 ? next : getVerses());
     setMounted(true);
   }, []);
 
@@ -59,13 +63,13 @@ export default function FlashcardPage() {
         result={sessionResult}
         onBack={() => router.push('/learn')}
         onAgain={() => {
-          
-          
-          setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
+          const next = getNextVerses();
+          setQueue(next.length > 0 ? next : getVerses());
           setIndex(0);
           setPhase('front');
           setFlipped(false);
           setSessionResult({ total: 0, known: 0, almost: 0, unknown: 0 });
+          requeueCount.current = {};
         }}
       />
     );
@@ -93,13 +97,40 @@ export default function FlashcardPage() {
       unknown: prev.unknown + (ratingLabel === 'unknown' ? 1 : 0),
     }));
 
-    const nextIndex = index + 1;
-    if (nextIndex >= queue.length) {
-      setPhase('done');
+    if (rating < 3) {
+      // "Nicht gewusst" — move verse to the end of the queue so it reappears,
+      // but only up to MAX_REQUEUE times to avoid infinite looping.
+      const count = (requeueCount.current[verse.id] ?? 0) + 1;
+      requeueCount.current[verse.id] = count;
+
+      if (count <= MAX_REQUEUE) {
+        setQueue((prev) => {
+          const withoutCurrent = prev.filter((_, i) => i !== index);
+          return [...withoutCurrent, updated];
+        });
+        // index stays the same — the next verse slides into the current slot
+        setFlipped(false);
+        setTimeout(() => setPhase('front'), 10);
+      } else {
+        // Re-queue limit reached — move on
+        const nextIndex = index + 1;
+        if (nextIndex >= queue.length) {
+          setPhase('done');
+        } else {
+          setIndex(nextIndex);
+          setFlipped(false);
+          setTimeout(() => setPhase('front'), 10);
+        }
+      }
     } else {
-      setIndex(nextIndex);
-      setFlipped(false);
-      setTimeout(() => setPhase('front'), 10);
+      const nextIndex = index + 1;
+      if (nextIndex >= queue.length) {
+        setPhase('done');
+      } else {
+        setIndex(nextIndex);
+        setFlipped(false);
+        setTimeout(() => setPhase('front'), 10);
+      }
     }
   };
 

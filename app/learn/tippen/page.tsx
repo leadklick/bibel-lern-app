@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";;
+import { getNextVerses, getVerses, updateVerse, recordStudySession, markSessionSeen } from "@/lib/storage";
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
 import ProgressBar from '@/components/ProgressBar';
@@ -46,6 +46,9 @@ function compareWords(expected: string, given: string): WordResult[] {
   return results;
 }
 
+// Maximum times a verse can be re-queued in one session
+const MAX_REQUEUE = 2;
+
 export default function TippenPage() {
   const router = useRouter();
   const [queue, setQueue] = useState<Verse[]>([]);
@@ -60,11 +63,11 @@ export default function TippenPage() {
     almost: 0,
     unknown: 0,
   });
+  const requeueCount = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    
-    
-    setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
+    const next = getNextVerses();
+    setQueue(next.length > 0 ? next : getVerses());
     setMounted(true);
   }, []);
 
@@ -97,14 +100,14 @@ export default function TippenPage() {
         result={sessionResult}
         onBack={() => router.push('/learn')}
         onAgain={() => {
-          
-          
-          setQueue(getNextVerses().length > 0 ? getNextVerses() : getVerses());
+          const next = getNextVerses();
+          setQueue(next.length > 0 ? next : getVerses());
           setIndex(0);
           setInput('');
           setWordResults([]);
           setPhase('typing');
           setSessionResult({ total: 0, known: 0, almost: 0, unknown: 0 });
+          requeueCount.current = {};
         }}
       />
     );
@@ -135,6 +138,7 @@ export default function TippenPage() {
     const updated = applyReview(verse, rating);
     updateVerse(updated);
     recordStudySession();
+    markSessionSeen(verse.id);
 
     const ratingLabel = rating >= 5 ? 'known' : rating >= 3 ? 'almost' : 'unknown';
     setSessionResult((prev) => ({
@@ -144,14 +148,40 @@ export default function TippenPage() {
       unknown: prev.unknown + (ratingLabel === 'unknown' ? 1 : 0),
     }));
 
-    const nextIndex = index + 1;
-    if (nextIndex >= queue.length) {
-      setPhase('done');
+    if (rating < 3) {
+      // "Nicht gewusst" — move verse to the end of the queue so it reappears,
+      // but only up to MAX_REQUEUE times to prevent infinite looping.
+      const count = (requeueCount.current[verse.id] ?? 0) + 1;
+      requeueCount.current[verse.id] = count;
+
+      if (count <= MAX_REQUEUE) {
+        const newQueue = [...queue.filter((_, i) => i !== index), updated];
+        setQueue(newQueue);
+        // index stays the same — the next verse slides into the current slot
+        setInput('');
+        setWordResults([]);
+        setPhase('typing');
+      } else {
+        const nextIndex = index + 1;
+        if (nextIndex >= queue.length) {
+          setPhase('done');
+        } else {
+          setIndex(nextIndex);
+          setInput('');
+          setWordResults([]);
+          setPhase('typing');
+        }
+      }
     } else {
-      setIndex(nextIndex);
-      setInput('');
-      setWordResults([]);
-      setPhase('typing');
+      const nextIndex = index + 1;
+      if (nextIndex >= queue.length) {
+        setPhase('done');
+      } else {
+        setIndex(nextIndex);
+        setInput('');
+        setWordResults([]);
+        setPhase('typing');
+      }
     }
   };
 
@@ -163,7 +193,7 @@ export default function TippenPage() {
   const autoRating = rawRating <= 1 ? 1 : rawRating <= 3 ? 3 : 5;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 page-enter">
       {/* Header */}
       <div className="flex items-center justify-between">
         <button

@@ -202,6 +202,11 @@ export default function DuelPage() {
 
           setCompletedBlanks(newCompleted);
 
+          // Update live score display based on current time and errors
+          const liveScore = calculatePoints(timeLeftRef.current, errorsRef.current);
+          setScore(liveScore);
+          scoreRef.current = liveScore;
+
           if (newCompleted >= totalBlanks) {
             // All blanks filled correctly
             setTimeout(() => {

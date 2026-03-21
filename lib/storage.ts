@@ -23,7 +23,12 @@ export function getVerses(): Verse[] {
 
 export function setVerses(verses: Verse[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(VERSES_KEY, JSON.stringify(verses));
+  try {
+    localStorage.setItem(VERSES_KEY, JSON.stringify(verses));
+  } catch (e) {
+    // localStorage quota exceeded — silently ignore to avoid crashing the UI
+    console.warn('localStorage quota exceeded when saving verses', e);
+  }
 }
 
 export function addVerse(verse: Verse): void {
@@ -89,13 +94,33 @@ export function getSessionSeen(): string[] {
 
 export function markSessionSeen(verseId: string): void {
   if (typeof window === 'undefined') return;
-  const seen = getSessionSeen();
-  if (seen.includes(verseId)) return;
-  const data: SessionData = {
-    seenIds: [...seen, verseId],
-    startTime: Date.now(),
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    let existing: SessionData | null = null;
+    if (raw) {
+      try {
+        const parsed: SessionData = JSON.parse(raw);
+        // Only reuse if the session hasn't expired
+        if (Date.now() - parsed.startTime <= SESSION_TTL) {
+          existing = parsed;
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+
+    const seen = existing ? existing.seenIds : [];
+    if (seen.includes(verseId)) return;
+
+    const data: SessionData = {
+      seenIds: [...seen, verseId],
+      // Preserve original startTime so TTL is relative to session start, not last action
+      startTime: existing ? existing.startTime : Date.now(),
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  } catch {
+    // ignore storage errors
+  }
 }
 
 export function getNextVerses(): Verse[] {
