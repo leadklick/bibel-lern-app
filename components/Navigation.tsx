@@ -15,6 +15,9 @@ export default function Navigation() {
   const pathname = usePathname();
   const [dueCount, setDueCount] = useState(0);
 
+  // Internal-only pages — not shown in nav
+  if (pathname.startsWith('/logo')) return null;
+
   useEffect(() => {
     setDueCount(getDueVerses().length);
   }, [pathname]);
