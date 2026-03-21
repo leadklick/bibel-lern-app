@@ -1,3 +1,7 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
 interface Props {
   value: number; // 0-100
   className?: string;
@@ -11,12 +15,20 @@ export default function ProgressBar({
   color = 'bg-blue-500',
   showPercent = false,
 }: Props) {
-  const pct = Math.min(100, Math.max(0, value));
+  const target = Math.min(100, Math.max(0, value));
+  const [pct, setPct] = useState(0);
+
+  // Animate from 0 to target on mount
+  useEffect(() => {
+    const t = setTimeout(() => setPct(target), 80);
+    return () => clearTimeout(t);
+  }, [target]);
+
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <div className="flex-1 bg-blue-100 rounded-full h-2.5">
         <div
-          className="h-2.5 rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+          className="h-2.5 rounded-full transition-all duration-1000 ease-out relative overflow-hidden"
           style={{
             width: `${pct}%`,
             background: 'linear-gradient(90deg, #93c5fd 0%, #3b82f6 50%, #1d4ed8 100%)',
