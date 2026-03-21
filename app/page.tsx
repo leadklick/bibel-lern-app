@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getVerses, getStats } from '@/lib/storage';
 import { isMastered, isDueToday } from '@/lib/sm2';
@@ -31,6 +31,8 @@ export default function Dashboard() {
     totalReviews: 0,
   });
   const [mounted, setMounted] = useState(false);
+  const [favoured, setFavoured] = useState(false);
+  const [shared, setShared] = useState(false);
 
   useEffect(() => {
     setVerses(getVerses());
@@ -90,9 +92,13 @@ export default function Dashboard() {
           &ldquo;{quote.text}&rdquo;
         </p>
         <p className="text-blue-400 text-sm mt-2">{quote.ref}</p>
-        <div className="flex items-center justify-center gap-4 mt-3">
-          <button className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-red-400 transition-colors active:scale-110">
-            <span className="text-base">🤍</span> Favorit
+        <div className="flex items-center justify-center gap-6 mt-5">
+          <button
+            onClick={() => setFavoured(f => !f)}
+            className={`flex items-center gap-1.5 text-xs font-medium transition-all active:scale-125 ${favoured ? 'text-red-500' : 'text-blue-300 hover:text-red-400'}`}
+          >
+            <span className="text-lg">{favoured ? '❤️' : '🤍'}</span>
+            {favoured ? 'Favorisiert' : 'Favorit'}
           </button>
           <button
             onClick={() => {
@@ -100,11 +106,14 @@ export default function Dashboard() {
                 navigator.share({ text: `"${quote.text}" – ${quote.ref}` });
               } else {
                 navigator.clipboard.writeText(`"${quote.text}" – ${quote.ref}`);
+                setShared(true);
+                setTimeout(() => setShared(false), 2000);
               }
             }}
-            className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-600 transition-colors active:scale-110"
+            className={`flex items-center gap-1.5 text-xs font-medium transition-all active:scale-110 ${shared ? 'text-green-500' : 'text-blue-300 hover:text-blue-600'}`}
           >
-            <span className="text-base">↗️</span> Teilen
+            <span className="text-lg">{shared ? '✅' : '↗️'}</span>
+            {shared ? 'Kopiert!' : 'Teilen'}
           </button>
         </div>
       </div>
@@ -137,7 +146,7 @@ export default function Dashboard() {
           pulse={dueCount > 0}
         />
         <StatCard label="Verse gesamt" value={verses.length} icon="📖" />
-        <StatCard label="Gemeistert" value={masteredCount} icon="🏆" />
+        <StatCard label="Gemeistert" value={masteredCount} icon="🏆" muted={masteredCount === 0} />
         <StatCard
           label="Lern-Streak"
           value={stats.streak}
@@ -162,18 +171,19 @@ export default function Dashboard() {
       {!isFirstTimeUser && (
         dueCount > 0 ? (
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white text-center shadow-lg">
-            <p className="text-2xl mb-1">🎯</p>
-            <p className="text-xl font-bold mb-1">
-              {dueCount} Vers{dueCount !== 1 ? 'e' : ''} warten auf dich!
+            <p className="text-2xl mb-2">🎯</p>
+            <p className="text-3xl font-extrabold mb-1 tracking-tight">
+              {dueCount} {dueCount !== 1 ? 'Verse' : 'Vers'} Warten!
             </p>
-            <p className="text-blue-100 text-sm mb-5">
+            <p className="text-blue-100 text-sm mb-6 leading-relaxed">
               Du schaffst das — jede Wiederholung bringt dich weiter.
             </p>
             <Link
               href="/learn"
-              className="block bg-white text-blue-700 font-bold px-6 py-3.5 rounded-xl hover:bg-blue-50 active:scale-95 transition-all text-base w-full text-center md:inline-block md:w-auto shadow-sm"
+              className="block bg-white text-blue-700 font-bold px-6 py-3.5 rounded-xl text-base w-full text-center md:inline-block md:w-auto shadow-sm
+                transition-all duration-200 hover:bg-blue-50 hover:shadow-md hover:scale-[1.02] active:scale-95"
             >
-              Jetzt lernen ✨
+              Jetzt Lernen ✨
             </Link>
           </div>
         ) : (
@@ -205,9 +215,9 @@ function StatCard({
   icon,
   highlight = false,
   subtext,
-  flameIcon = false,
   pulse = false,
   streak = false,
+  muted = false,
 }: {
   label: string;
   value: number | string;
@@ -217,15 +227,18 @@ function StatCard({
   flameIcon?: boolean;
   pulse?: boolean;
   streak?: boolean;
+  muted?: boolean;
 }) {
   return (
     <div
-      className={`rounded-2xl p-4 md:p-5 text-center border shadow-sm flex flex-col items-center gap-1 transition-all ${
+      className={`rounded-2xl p-4 md:p-5 text-center border flex flex-col items-center gap-1 transition-all ${
         highlight
-          ? 'bg-blue-600 border-blue-600 text-white'
+          ? 'bg-blue-600 border-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.45)]'
           : streak
-          ? 'bg-gradient-to-b from-orange-50 to-amber-50 border-orange-200 text-orange-900'
-          : 'bg-white border-blue-100 text-blue-900'
+          ? 'bg-gradient-to-b from-orange-50 to-amber-50 border-orange-200 text-orange-900 shadow-sm'
+          : muted
+          ? 'bg-white border-blue-50 text-blue-300 shadow-none opacity-60'
+          : 'bg-white border-blue-100 text-blue-900 shadow-sm'
       }`}
     >
       <span className="text-2xl">{icon}</span>
@@ -235,7 +248,7 @@ function StatCard({
           {subtext}
         </div>
       ) : (
-        <div className={`text-xs md:text-sm ${highlight ? 'text-blue-200' : streak ? 'text-orange-400' : 'text-blue-500'}`}>
+        <div className={`text-xs md:text-sm ${highlight ? 'text-blue-200' : streak ? 'text-orange-400' : muted ? 'text-blue-300' : 'text-blue-500'}`}>
           {label}
         </div>
       )}
