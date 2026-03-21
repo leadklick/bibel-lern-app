@@ -31,7 +31,7 @@ export default function ProgressBar({
           className="h-2.5 rounded-full transition-all duration-1000 ease-out relative overflow-hidden"
           style={{
             width: `${pct}%`,
-            background: 'linear-gradient(90deg, #93c5fd 0%, #3b82f6 50%, #1d4ed8 100%)',
+            background: 'linear-gradient(90deg, #FDE68A 0%, #F59E0B 50%, #B45309 100%)',
           }}
         >
           {pct > 5 && (
@@ -44,7 +44,7 @@ export default function ProgressBar({
         </div>
       </div>
       {showPercent && (
-        <span className="text-xs font-semibold text-blue-600 w-10 text-right shrink-0">
+        <span className="text-xs font-semibold text-amber-600 w-10 text-right shrink-0">
           {Math.round(pct)}%
         </span>
       )}

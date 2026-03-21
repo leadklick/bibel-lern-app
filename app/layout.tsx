@@ -3,7 +3,7 @@ import './globals.css';
 import Navigation from '@/components/Navigation';
 
 export const metadata: Metadata = {
-  title: 'Bibel Lern App',
+  title: 'BibelMeister',
   description: 'Bibelverse lernen mit Spaced Repetition',
 };
 

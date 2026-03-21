@@ -70,8 +70,8 @@ export default function Dashboard() {
     <div className="flex flex-col gap-6 md:gap-8 page-enter">
       {/* Hero */}
       <div className="text-center py-2 md:py-4">
-        <h1 className="text-3xl md:text-4xl font-bold text-blue-900 mb-1">
-          Guten Tag! ✝
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-1">
+          Guten Tag 👋
         </h1>
         <p className="text-blue-500 text-sm md:text-base">
           {new Date().toLocaleDateString('de-DE', {
@@ -120,15 +120,15 @@ export default function Dashboard() {
 
       {/* First-time welcome */}
       {isFirstTimeUser && (
-        <div className="bg-blue-600 rounded-2xl p-6 text-white text-center shadow-md">
+        <div className="bg-gradient-to-br from-slate-900 to-amber-700 rounded-2xl p-6 text-white text-center shadow-md">
           <p className="text-2xl mb-2">👋</p>
           <p className="font-bold text-xl mb-1">Herzlich willkommen!</p>
-          <p className="text-blue-200 text-sm mb-4 leading-relaxed">
+          <p className="text-amber-200 text-sm mb-4 leading-relaxed">
             Füge deinen ersten Bibelvers hinzu und starte deine tägliche Lernsession.
           </p>
           <Link
             href="/verse/add"
-            className="inline-block bg-white text-blue-700 font-semibold px-6 py-3 rounded-xl hover:bg-blue-50 transition-colors text-base"
+            className="inline-block bg-white text-slate-900 font-semibold px-6 py-3 rounded-xl hover:bg-amber-50 transition-colors text-base"
           >
             Ersten Vers hinzufügen →
           </Link>
@@ -170,18 +170,18 @@ export default function Dashboard() {
       {/* CTA: Due Today */}
       {!isFirstTimeUser && (
         dueCount > 0 ? (
-          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white text-center shadow-lg">
+          <div className="bg-gradient-to-br from-slate-900 to-amber-600 rounded-2xl p-6 text-white text-center shadow-lg">
             <p className="text-2xl mb-2">🎯</p>
             <p className="text-3xl font-extrabold mb-1 tracking-tight">
               {dueCount} {dueCount !== 1 ? 'Verse' : 'Vers'} Warten!
             </p>
-            <p className="text-blue-100 text-sm mb-6 leading-relaxed">
+            <p className="text-amber-100 text-sm mb-6 leading-relaxed">
               Du schaffst das — jede Wiederholung bringt dich weiter.
             </p>
             <Link
               href="/learn"
-              className="block bg-white text-blue-700 font-bold px-6 py-3.5 rounded-xl text-base w-full text-center md:inline-block md:w-auto shadow-sm
-                transition-all duration-200 hover:bg-blue-50 hover:shadow-md hover:scale-[1.02] active:scale-95"
+              className="block bg-white text-slate-900 font-bold px-6 py-3.5 rounded-xl text-base w-full text-center md:inline-block md:w-auto shadow-sm
+                transition-all duration-200 hover:bg-amber-50 hover:shadow-md hover:scale-[1.02] active:scale-95"
             >
               Jetzt Lernen ✨
             </Link>
@@ -233,7 +233,7 @@ function StatCard({
     <div
       className={`rounded-2xl p-4 md:p-5 text-center border flex flex-col items-center gap-1 transition-all ${
         highlight
-          ? 'bg-blue-600 border-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.45)]'
+          ? 'bg-amber-500 border-amber-400 text-white shadow-[0_0_16px_rgba(245,158,11,0.45)]'
           : streak
           ? 'bg-gradient-to-b from-orange-50 to-amber-50 border-orange-200 text-orange-900 shadow-sm'
           : muted
@@ -244,11 +244,11 @@ function StatCard({
       <span className="text-2xl">{icon}</span>
       <div className={`text-2xl md:text-3xl font-bold leading-tight ${pulse ? 'animate-pulse' : ''} ${streak ? 'text-orange-500' : ''}`}>{value}</div>
       {subtext ? (
-        <div className={`text-xs font-semibold ${highlight ? 'text-blue-100' : 'text-green-600'}`}>
+        <div className={`text-xs font-semibold ${highlight ? 'text-amber-100' : 'text-green-600'}`}>
           {subtext}
         </div>
       ) : (
-        <div className={`text-xs md:text-sm ${highlight ? 'text-blue-200' : streak ? 'text-orange-400' : muted ? 'text-blue-300' : 'text-blue-500'}`}>
+        <div className={`text-xs md:text-sm ${highlight ? 'text-amber-100' : streak ? 'text-orange-400' : muted ? 'text-blue-300' : 'text-blue-500'}`}>
           {label}
         </div>
       )}
