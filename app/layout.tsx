@@ -13,11 +13,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className="h-full">
-      <body className="min-h-full flex flex-col">
+    <html lang="de">
+      <body className="flex flex-col bg-[#f0f6ff]">
         <Navigation />
-        {/* pb-20 on mobile to clear the fixed bottom nav; md:pb-0 on desktop */}
-        <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-5 pb-24 md:pb-8 md:py-8 overflow-x-hidden">
+        <main className="max-w-3xl mx-auto w-full px-4 py-5 pb-24 md:pb-8 md:py-8 overflow-x-hidden">
           {children}
         </main>
       </body>
