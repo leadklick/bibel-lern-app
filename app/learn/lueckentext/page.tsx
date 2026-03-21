@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getDueVerses, getVerses, updateVerse, recordStudySession } from '@/lib/storage';
 import { applyReview } from '@/lib/sm2';
 import { Verse } from '@/lib/types';
+import { generateSmartGaps, isSynonym, Difficulty } from '@/lib/smart-gaps';
 import ProgressBar from '@/components/ProgressBar';
 import Confetti from '@/components/Confetti';
 
@@ -12,7 +13,7 @@ type Phase = 'exercise' | 'result' | 'done';
 
 type MatchResult = 'correct' | 'almost' | 'wrong' | null;
 
-interface BlankWord {
+interface BlankWordWithResult {
   word: string;
   isBlank: boolean;
   userInput: string;
@@ -53,6 +54,9 @@ function fuzzyMatch(expected: string, given: string): MatchResult {
 
   if (exp === giv) return 'correct';
 
+  // Check synonyms before Levenshtein
+  if (isSynonym(expected, given)) return 'almost';
+
   const dist = levenshtein(exp, giv);
   const threshold = exp.length >= 5 ? 2 : 1;
 
@@ -60,22 +64,27 @@ function fuzzyMatch(expected: string, given: string): MatchResult {
   return 'wrong';
 }
 
-function buildBlanks(text: string): BlankWord[] {
-  const words = text.split(/\s+/);
-  return words.map((word, i) => {
-    const clean = word.replace(/[.,;:!?»«„"]+$/g, '');
-    const shouldBlank = clean.length > 3 && (i % 4 === 3 || i % 7 === 5);
-    return { word, isBlank: shouldBlank, userInput: '', correct: null };
-  });
+function buildBlanksForVerse(text: string, difficulty: Difficulty): BlankWordWithResult[] {
+  return generateSmartGaps(text, difficulty).map((b) => ({
+    ...b,
+    correct: null as MatchResult,
+  }));
 }
+
+const DIFFICULTY_LABELS: { value: Difficulty; label: string }[] = [
+  { value: 'einfach', label: 'Einfach' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'meister', label: 'Meister' },
+];
 
 export default function LueckentextPage() {
   const router = useRouter();
   const [queue, setQueue] = useState<Verse[]>([]);
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>('exercise');
-  const [blanks, setBlanks] = useState<BlankWord[]>([]);
+  const [blanks, setBlanks] = useState<BlankWordWithResult[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [sessionResult, setSessionResult] = useState<SessionResult>({
     total: 0,
     known: 0,
@@ -89,9 +98,18 @@ export default function LueckentextPage() {
     const all = getVerses();
     const q = due.length > 0 ? due : all;
     setQueue(q);
-    if (q.length > 0) setBlanks(buildBlanks(q[0].text));
+    if (q.length > 0) setBlanks(buildBlanksForVerse(q[0].text, 'normal'));
     setMounted(true);
   }, []);
+
+  // Rebuild blanks when difficulty changes (only during exercise phase)
+  useEffect(() => {
+    if (!mounted) return;
+    if (queue.length === 0) return;
+    if (phase !== 'exercise') return;
+    setBlanks(buildBlanksForVerse(queue[index].text, difficulty));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [difficulty]);
 
   if (!mounted) {
     return (
@@ -172,7 +190,7 @@ export default function LueckentextPage() {
               const q = due.length > 0 ? due : all;
               setQueue(q);
               setIndex(0);
-              if (q.length > 0) setBlanks(buildBlanks(q[0].text));
+              if (q.length > 0) setBlanks(buildBlanksForVerse(q[0].text, difficulty));
               setPhase('exercise');
               setSessionResult({ total: 0, known: 0, almost: 0, unknown: 0 });
             }}
@@ -200,7 +218,7 @@ export default function LueckentextPage() {
       setPhase('done');
     } else {
       setIndex(nextIndex);
-      setBlanks(buildBlanks(queue[nextIndex].text));
+      setBlanks(buildBlanksForVerse(queue[nextIndex].text, difficulty));
       setPhase('exercise');
     }
   };
@@ -233,7 +251,7 @@ export default function LueckentextPage() {
       setPhase('done');
     } else {
       setIndex(nextIndex);
-      setBlanks(buildBlanks(queue[nextIndex].text));
+      setBlanks(buildBlanksForVerse(queue[nextIndex].text, difficulty));
       setPhase('exercise');
     }
   };
@@ -271,6 +289,25 @@ export default function LueckentextPage() {
       </div>
 
       <ProgressBar value={progress} showPercent />
+
+      {/* Difficulty selector */}
+      {phase === 'exercise' && (
+        <div className="flex gap-2 justify-center">
+          {DIFFICULTY_LABELS.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setDifficulty(value)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors min-h-[40px] ${
+                difficulty === value
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Verse reference + tags */}
       <div className="text-center flex flex-col items-center gap-2">

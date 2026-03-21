@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getVerses, getBestScore, saveDuelResult } from '@/lib/storage';
 import { calculatePoints } from '@/lib/duel';
 import { Verse, DuelResult } from '@/lib/types';
+import { generateSmartGaps } from '@/lib/smart-gaps';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -26,12 +27,10 @@ function normalize(s: string): string {
 }
 
 function buildBlanks(text: string): BlankWord[] {
-  const words = text.split(/\s+/);
-  return words.map((word, i) => {
-    const clean = word.replace(/[.,;:!?»«„"]+$/g, '');
-    const shouldBlank = clean.length > 3 && (i % 4 === 3 || i % 7 === 5);
-    return { word, isBlank: shouldBlank, userInput: '', status: 'idle' as const };
-  });
+  return generateSmartGaps(text, 'normal').map((b) => ({
+    ...b,
+    status: 'idle' as const,
+  }));
 }
 
 function formatTime(seconds: number): string {
