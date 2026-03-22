@@ -1,33 +1,57 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { QuizSet } from '@/lib/quiz-types';
+
+const CATEGORY_COLORS: Record<string, string> = {
+  AT: 'bg-amber-100 text-amber-800',
+  NT: 'bg-blue-100 text-blue-800',
+  Evangelien: 'bg-green-100 text-green-800',
+  Psalmen: 'bg-purple-100 text-purple-800',
+  Propheten: 'bg-orange-100 text-orange-800',
+  Paulus: 'bg-cyan-100 text-cyan-800',
+  Gemischt: 'bg-slate-100 text-slate-700',
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  AT: '📜',
+  NT: '✝️',
+  Evangelien: '📖',
+  Psalmen: '🎵',
+  Propheten: '🔥',
+  Paulus: '✉️',
+  Gemischt: '🌍',
+};
 
 export default function QuizLandingPage() {
   const router = useRouter();
+  const [sets, setSets] = useState<QuizSet[]>([]);
+  const [loading, setLoading] = useState(true);
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    fetch('/api/quiz/sets')
+      .then(r => r.json())
+      .then((data: QuizSet[]) => setSets(data))
+      .finally(() => setLoading(false));
+  }, []);
+
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     const code = joinCode.trim().toUpperCase();
-    if (code.length !== 6) {
-      setError('Bitte gib einen 6-stelligen Raumcode ein.');
-      return;
-    }
+    if (code.length !== 6) return;
     setJoining(true);
     setError('');
     try {
       const res = await fetch(`/api/quiz/rooms/${code}`);
-      if (!res.ok) {
-        setError('Raum nicht gefunden. Überprüfe den Code und versuche es erneut.');
-        return;
-      }
+      if (!res.ok) { setError('Raum nicht gefunden.'); return; }
       router.push(`/quiz/${code}`);
     } catch {
-      setError('Netzwerkfehler. Bitte versuche es erneut.');
+      setError('Netzwerkfehler.');
     } finally {
       setJoining(false);
     }
@@ -37,34 +61,54 @@ export default function QuizLandingPage() {
     <div className="flex flex-col gap-5 page-enter">
       {/* Header */}
       <div className="text-center py-2">
-        <div className="text-5xl mb-3">🎮</div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">BibelQuiz</h1>
-        <p className="text-blue-500 text-sm">Teste dein Bibelwissen!</p>
+        <div className="text-4xl mb-2">🎮</div>
+        <h1 className="text-2xl font-bold text-slate-900">BibelQuiz</h1>
+        <p className="text-blue-500 text-sm mt-1">Wähle ein Quiz und spiele sofort!</p>
       </div>
 
-      {/* Solo card — most prominent */}
-      <div className="bg-gradient-to-br from-slate-900 to-amber-700 rounded-2xl p-6 text-white shadow-lg">
-        <div className="text-3xl mb-3">🎯</div>
-        <h2 className="text-xl font-bold mb-1">Alleine spielen</h2>
-        <p className="text-amber-200 text-sm mb-4 leading-relaxed">
-          10 Quiz-Sets bereit — von AT bis NT. Wähle eines und leg sofort los!
-        </p>
-        <Link
-          href="/quiz/solo"
-          className="block bg-white text-slate-900 font-bold px-6 py-3 rounded-xl text-center text-sm hover:bg-amber-50 transition-colors active:scale-[0.97]"
-        >
-          Quiz starten →
-        </Link>
+      {/* Quiz sets list */}
+      {loading ? (
+        <div className="flex flex-col gap-3">
+          {[0,1,2,3].map(i => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sets.map(set => (
+            <Link
+              key={set.id}
+              href={`/quiz/solo?set=${set.id}`}
+              className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 flex items-center gap-4 hover:border-amber-300 hover:shadow-md transition-all active:scale-[0.97]"
+            >
+              <div className="text-3xl shrink-0">
+                {CATEGORY_ICONS[set.category] ?? '📋'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-slate-900 text-sm">{set.title}</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${CATEGORY_COLORS[set.category] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {set.category}
+                  </span>
+                </div>
+                <p className="text-slate-400 text-xs mt-0.5">{set.questions.length} Fragen</p>
+              </div>
+              <span className="text-amber-400 text-xl font-bold shrink-0">▶</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-blue-100" />
+        <span className="text-xs text-blue-300 font-medium">Mit Freunden spielen</span>
+        <div className="flex-1 h-px bg-blue-100" />
       </div>
 
-      {/* Multiplayer section */}
-      <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5">
-        <p className="text-xs text-blue-400 uppercase font-semibold tracking-widest mb-4">Mit Freunden spielen</p>
-
-        {/* Host */}
+      {/* Multiplayer */}
+      <div className="flex flex-col gap-3">
         <Link
           href="/quiz/host"
-          className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors active:scale-[0.97] border border-slate-100 mb-3"
+          className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 flex items-center gap-3 hover:border-blue-300 hover:shadow-md transition-all active:scale-[0.97]"
         >
           <span className="text-2xl">👑</span>
           <div>
@@ -74,38 +118,28 @@ export default function QuizLandingPage() {
           <span className="ml-auto text-blue-300 text-lg">›</span>
         </Link>
 
-        {/* Join */}
-        <form onSubmit={handleJoin} className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={joinCode}
-              onChange={(e) => {
-                setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
-                setError('');
-              }}
-              placeholder="RAUMCODE"
-              maxLength={6}
-              className="flex-1 border border-blue-200 rounded-xl px-4 py-2.5 text-lg font-bold text-center tracking-widest text-slate-900 uppercase placeholder:text-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-            <button
-              type="submit"
-              disabled={joining || joinCode.length !== 6}
-              className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200 text-white font-bold px-5 py-2.5 rounded-xl transition-colors active:scale-[0.97] shrink-0"
-            >
-              {joining ? '...' : '🙋 Join'}
-            </button>
-          </div>
-          {error && <p className="text-red-500 text-xs text-center">{error}</p>}
+        <form onSubmit={handleJoin} className="flex gap-2">
+          <input
+            type="text"
+            value={joinCode}
+            onChange={(e) => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setError(''); }}
+            placeholder="RAUMCODE"
+            maxLength={6}
+            className="flex-1 border border-blue-200 rounded-xl px-4 py-2.5 text-base font-bold text-center tracking-widest uppercase placeholder:text-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <button
+            type="submit"
+            disabled={joining || joinCode.length !== 6}
+            className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200 text-white font-bold px-4 py-2.5 rounded-xl transition-colors active:scale-[0.97] shrink-0 text-sm"
+          >
+            {joining ? '...' : '🙋 Join'}
+          </button>
         </form>
+        {error && <p className="text-red-500 text-xs text-center">{error}</p>}
       </div>
 
-      {/* Admin link */}
       <div className="text-center">
-        <Link
-          href="/quiz/admin"
-          className="text-blue-400 text-xs hover:text-blue-600 transition-colors"
-        >
+        <Link href="/quiz/admin" className="text-blue-300 text-xs hover:text-blue-500 transition-colors">
           Quiz-Sets verwalten ›
         </Link>
       </div>
