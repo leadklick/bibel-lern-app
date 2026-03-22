@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const sets = getAllQuizSets();
-  return Response.json({ sets });
+  return Response.json(sets);
 }
 
 export async function POST(request: NextRequest) {
