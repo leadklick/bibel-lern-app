@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QuizSet, QuizQuestion } from '@/lib/quiz-types';
 import AnswerButton from '@/components/quiz/AnswerButton';
@@ -26,7 +26,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Gemischt: 'bg-slate-100 text-slate-700',
 };
 
-export default function SoloQuizPage() {
+function SoloQuizPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedId = searchParams.get('set');
@@ -363,4 +363,12 @@ export default function SoloQuizPage() {
   }
 
   return null;
+}
+
+export default function SoloQuizPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><span className="text-blue-400 animate-pulse text-lg">Lädt…</span></div>}>
+      <SoloQuizPage />
+    </Suspense>
+  );
 }
