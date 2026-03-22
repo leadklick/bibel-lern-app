@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { QuizSet } from '@/lib/quiz-types';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -26,12 +25,8 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 export default function QuizLandingPage() {
-  const router = useRouter();
   const [sets, setSets] = useState<QuizSet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [joinCode, setJoinCode] = useState('');
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     fetch('/api/quiz/sets')
@@ -40,36 +35,17 @@ export default function QuizLandingPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleJoin(e: React.FormEvent) {
-    e.preventDefault();
-    const code = joinCode.trim().toUpperCase();
-    if (code.length !== 6) return;
-    setJoining(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/quiz/rooms/${code}`);
-      if (!res.ok) { setError('Raum nicht gefunden.'); return; }
-      router.push(`/quiz/${code}`);
-    } catch {
-      setError('Netzwerkfehler.');
-    } finally {
-      setJoining(false);
-    }
-  }
-
   return (
     <div className="flex flex-col gap-5 page-enter">
-      {/* Header */}
       <div className="text-center py-2">
         <div className="text-4xl mb-2">🎮</div>
         <h1 className="text-2xl font-bold text-slate-900">BibelQuiz</h1>
-        <p className="text-blue-500 text-sm mt-1">Wähle ein Quiz und spiele sofort!</p>
+        <p className="text-blue-500 text-sm mt-1">Wähle ein Quiz und teste dein Wissen!</p>
       </div>
 
-      {/* Quiz sets list */}
       {loading ? (
         <div className="flex flex-col gap-3">
-          {[0,1,2,3].map(i => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+          {[0, 1, 2, 3, 4].map(i => <div key={i} className="skeleton h-20 rounded-2xl" />)}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -96,47 +72,6 @@ export default function QuizLandingPage() {
           ))}
         </div>
       )}
-
-      {/* Divider */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-blue-100" />
-        <span className="text-xs text-blue-300 font-medium">Mit Freunden spielen</span>
-        <div className="flex-1 h-px bg-blue-100" />
-      </div>
-
-      {/* Multiplayer */}
-      <div className="flex flex-col gap-3">
-        <Link
-          href="/quiz/host"
-          className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 flex items-center gap-3 hover:border-blue-300 hover:shadow-md transition-all active:scale-[0.97]"
-        >
-          <span className="text-2xl">👑</span>
-          <div>
-            <p className="font-semibold text-slate-900 text-sm">Spiel erstellen</p>
-            <p className="text-blue-400 text-xs">Raum öffnen & Code teilen</p>
-          </div>
-          <span className="ml-auto text-blue-300 text-lg">›</span>
-        </Link>
-
-        <form onSubmit={handleJoin} className="flex gap-2">
-          <input
-            type="text"
-            value={joinCode}
-            onChange={(e) => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setError(''); }}
-            placeholder="RAUMCODE"
-            maxLength={6}
-            className="flex-1 border border-blue-200 rounded-xl px-4 py-2.5 text-base font-bold text-center tracking-widest uppercase placeholder:text-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <button
-            type="submit"
-            disabled={joining || joinCode.length !== 6}
-            className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200 text-white font-bold px-4 py-2.5 rounded-xl transition-colors active:scale-[0.97] shrink-0 text-sm"
-          >
-            {joining ? '...' : '🙋 Join'}
-          </button>
-        </form>
-        {error && <p className="text-red-500 text-xs text-center">{error}</p>}
-      </div>
 
       <div className="text-center">
         <Link href="/quiz/admin" className="text-blue-300 text-xs hover:text-blue-500 transition-colors">
