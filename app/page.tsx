@@ -204,6 +204,7 @@ export default function Dashboard() {
         <QuickLink href="/verse/add" label="Vers hinzufügen" icon="➕" desc="Neue Bibelstelle" />
         <QuickLink href="/verse" label="Alle Verse" icon="📖" desc="Verwalten & suchen" />
         <QuickLink href="/learn" label="Lernmodus" icon="🧠" desc="Karteikarten & mehr" />
+        <QuickLink href="/quiz" label="Live Quiz" icon="🎮" desc="Kahoot-Stil" />
       </div>
     </div>
   );

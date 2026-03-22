@@ -10,6 +10,7 @@ const links = [
   { href: '/', label: 'Start', icon: '🏠' },
   { href: '/verse', label: 'Verse', icon: '📖' },
   { href: '/learn', label: 'Lernen', icon: '🧠' },
+  { href: '/quiz', label: 'Quiz', icon: '🎮' },
 ];
 
 export default function Navigation() {
